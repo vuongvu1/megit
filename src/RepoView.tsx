@@ -37,6 +37,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       api<{ files: StatusEntry[] }>(`/api/status?${q}`),
     ]).then(([gRes, s]) => {
       if (g !== gen.current) return // superseded by a newer request — latest wins
+      setError(null)
       const gf = graphFp(gRes.commits, gRes.hasMore)
       if (fps.current.graph !== gf) {
         fps.current.graph = gf
@@ -50,8 +51,11 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       if (fps.current.status !== sf) {
         fps.current.status = sf
         setStatus(s.files)
-        setWipTick(t => t + 1)
       }
+      // bump unconditionally: an unchanged status fingerprint doesn't mean the WIP
+      // diff contents are unchanged (re-saving a modified file keeps status+path the
+      // same) — DiffView needs a signal on every successful refresh, not just fp changes
+      setWipTick(t => t + 1)
     }).catch(e => {
       if (g !== gen.current) return
       // background refreshes fail silently — except a gone repo, which must surface
@@ -93,18 +97,20 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     return () => window.removeEventListener('keydown', onKey)
   }, [refresh])
 
-  const loadMore = () => {
+  const loadMore = useCallback(() => {
     const g = ++gen.current
-    api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&skip=${commits.length}`)
-      .then(gRes => {
+    api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&skip=${loaded.current}`)
+      .then(res => {
         if (g !== gen.current) return
-        const next = [...commits, ...gRes.commits]
-        fps.current.graph = graphFp(next, gRes.hasMore)
-        setCommits(next)
-        setHasMore(gRes.hasMore)
+        setCommits(prev => {
+          const next = [...prev, ...res.commits]
+          fps.current.graph = graphFp(next, res.hasMore)
+          return next
+        })
+        setHasMore(res.hasMore)
       })
       .catch(e => { if (g !== gen.current) return; setError({ msg: e.message, gone: false }) })
-  }
+  }, [q])
 
   if (error) {
     return (

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import type { Commit, StatusEntry } from '../server/parse.ts'
 import { layout, type LaneRow } from './lanes'
 import type { Selection } from './RepoView'
@@ -28,7 +28,7 @@ function GraphCell({ row, width }: { row: LaneRow; width: number }) {
 const fmtDate = (unix: number) =>
   new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 
-export default function GraphView({ commits, status, selection, onSelect, onLoadMore, hasMore }: {
+function GraphView({ commits, status, selection, onSelect, onLoadMore, hasMore }: {
   commits: Commit[]
   status: StatusEntry[]
   selection: Selection
@@ -69,3 +69,5 @@ export default function GraphView({ commits, status, selection, onSelect, onLoad
     </div>
   )
 }
+
+export default memo(GraphView)
