@@ -29,6 +29,7 @@ Open the app, hit “+” in the tab bar, browse to a local git repository, Open
 - Sticky WIP row on top — staged, unstaged, and untracked changes
 - Click a commit → changed files → per-file diff; merge commits diff against the first parent
 - Unified ⇄ side-by-side toggle, `r` or ⟳ to refresh
+- Auto-refresh — the server watches each open repo (`fs.watch` + SSE); the graph and WIP row update within ~1 s of any change. Manual refresh (`r`) still works.
 
 Repo list persists in `~/.config/megit/config.json`.
 

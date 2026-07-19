@@ -6,7 +6,7 @@ import DiffView from './DiffView'
 
 const STATUS_COLOR: Record<string, string> = { M: '#e5c07b', A: '#98c379', D: '#e06c75', R: '#61afef', '?': '#98c379', U: '#e06c75' }
 
-export default function CommitPanel({ repo, selection, status }: { repo: string; selection: Selection; status: StatusEntry[] }) {
+export default function CommitPanel({ repo, selection, status, wipTick }: { repo: string; selection: Selection; status: StatusEntry[]; wipTick: number }) {
   const [fetched, setFetched] = useState<StatusEntry[]>([])
   const [file, setFile] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -36,7 +36,7 @@ export default function CommitPanel({ repo, selection, status }: { repo: string;
         ))}
         {!error && files.length === 0 && <div className="empty">No changes</div>}
       </div>
-      {file && <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file} />}
+      {file && <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file} wipTick={wipTick} />}
     </div>
   )
 }

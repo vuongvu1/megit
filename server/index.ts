@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { loadConfig, saveConfig } from './config.ts'
 import { parseLog, parseStatus, LOG_FORMAT } from './parse.ts'
+import { subscribe } from './watch.ts'
 
 const app = express()
 app.use(express.json())
@@ -89,10 +90,11 @@ app.get('/api/fs', (req, res) => {
 app.get('/api/graph', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const skip = Number(req.query.skip) || 0
+  const limit = Math.max(1, Number(req.query.limit) || 500)
   try {
-    const raw = await git(repo, ['log', '--all', '--topo-order', `--skip=${skip}`, '--max-count=501', `--format=${LOG_FORMAT}`])
+    const raw = await git(repo, ['log', '--all', '--topo-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`])
     const commits = parseLog(raw)
-    res.json({ commits: commits.slice(0, 500), hasMore: commits.length > 500 })
+    res.json({ commits: commits.slice(0, limit), hasMore: commits.length > limit })
   } catch (e) {
     const msg = (e as Error).message
     if (/does not have any commits yet/.test(msg)) {
@@ -109,6 +111,39 @@ app.get('/api/status', repoGuard, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
   }
+})
+
+app.get('/api/events', repoGuard, (req, res) => {
+  const repo = String(req.query.repo)
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  })
+  res.write(': connected\n\n')
+  const ping = setInterval(() => res.write(': ping\n\n'), 30_000)
+  let unsub: (() => void) | null = null
+  const cleanup = () => {
+    clearInterval(ping)
+    unsub?.()
+    unsub = null
+  }
+  try {
+    unsub = subscribe(
+      repo,
+      () => res.write('data: changed\n\n'),
+      () => {
+        cleanup()
+        res.end()
+      },
+    )
+  } catch {
+    // watcher couldn't start (EMFILE, permissions) — client degrades to manual refresh
+    cleanup()
+    res.end()
+    return
+  }
+  req.on('close', cleanup)
 })
 
 async function firstParent(repo: string, hash: string): Promise<string | null> {
