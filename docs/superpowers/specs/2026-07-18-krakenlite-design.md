@@ -1,4 +1,4 @@
-# krakenlite — Design
+# megit — Design
 
 **Date:** 2026-07-18
 **Status:** Approved
@@ -29,14 +29,14 @@ All mutations (commit, push, checkout, staging) stay in the terminal. The app ne
 ## Architecture
 
 ```
-krakenlite/
+megit/
 ├── server/     Node 24 + TypeScript + Express, shells out to `git` CLI
 ├── src/        React + Vite frontend
 └── package.json   single package, pnpm, no monorepo
 ```
 
 - **Git access:** `child_process.execFile('git', [...])`. No libgit2/nodegit dependency. Only read-only commands are used: `log`, `status`, `show`, `diff`, `diff-tree`, `rev-parse`.
-- **Config:** `~/.config/krakenlite/config.json` — list of repo paths plus last active tab. Owned and written by the server.
+- **Config:** `~/.config/megit/config.json` — list of repo paths plus last active tab. Owned and written by the server.
 - **Dev mode:** Vite dev server proxies `/api` to Express.
 - **Daily use:** `vite build` once; Express serves `dist/` — a single `node` process, open localhost in the browser.
 

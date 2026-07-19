@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-const dir = join(homedir(), '.config', 'krakenlite')
+const dir = join(homedir(), '.config', 'megit')
 const file = join(dir, 'config.json')
 
 export type Config = { repos: string[]; activeRepo: string | null }

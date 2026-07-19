@@ -1,4 +1,4 @@
-# krakenlite Implementation Plan
+# megit Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -14,7 +14,7 @@
 - All git invocations via `execFile('git', ['-C', repo, ...args])` — never shell interpolation.
 - Server binds `127.0.0.1` only.
 - Every repo-scoped endpoint validates `repo` against the config list before running git.
-- Config at `~/.config/krakenlite/config.json`, written only by the server.
+- Config at `~/.config/megit/config.json`, written only by the server.
 - Graph pages: 500 commits per page.
 - File diff cap ~1 MB; `?force=1` bypasses.
 - No state library, no react-query. No component tests in v1.
@@ -95,7 +95,7 @@ export default defineConfig({
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>krakenlite</title>
+    <title>megit</title>
   </head>
   <body>
     <div id="root"></div>
@@ -114,7 +114,7 @@ import './styles.css'
 createRoot(document.getElementById('root')!).render(<App />)
 ```
 
-`src/App.tsx` placeholder: `export default function App() { return <h1>krakenlite</h1> }`
+`src/App.tsx` placeholder: `export default function App() { return <h1>megit</h1> }`
 
 - [ ] **Step 5: server/index.ts skeleton**
 
@@ -134,7 +134,7 @@ if (existsSync(dist)) {
   app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(dist, 'index.html')))
 }
 
-app.listen(3411, '127.0.0.1', () => console.log('krakenlite API on http://127.0.0.1:3411'))
+app.listen(3411, '127.0.0.1', () => console.log('megit API on http://127.0.0.1:3411'))
 ```
 
 - [ ] **Step 6: Verify**
@@ -413,7 +413,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-const dir = join(homedir(), '.config', 'krakenlite')
+const dir = join(homedir(), '.config', 'megit')
 const file = join(dir, 'config.json')
 
 export type Config = { repos: string[]; activeRepo: string | null }

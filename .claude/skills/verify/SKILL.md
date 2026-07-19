@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Build, launch and drive krakenlite to verify changes end-to-end
+description: Build, launch and drive megit to verify changes end-to-end
 ---
 
-# Verifying krakenlite
+# Verifying megit
 
 Node ≥ 24 required (native TS type-stripping). With nvm: `export PATH="$HOME/.nvm/versions/node/v24.16.0/bin:$PATH"` (plain `nvm use` doesn't persist across Bash tool calls).
 
@@ -39,6 +39,6 @@ curl -s "localhost:3411/api/diff?repo=…&file=…"                    # no hash
 
 ## Gotchas
 
-- App config is real: `~/.config/krakenlite/config.json` — remove test repos you add (DELETE `/api/repos?repo=…` or the tab's ×).
+- App config is real: `~/.config/megit/config.json` — remove test repos you add (DELETE `/api/repos?repo=…` or the tab's ×).
 - Playwright MCP drops `.playwright-mcp/` snapshots and screenshots into the CWD — move them out before committing.
 - Unit tests (parsers, lanes): `pnpm test`; typecheck: `npx tsc --noEmit`.
