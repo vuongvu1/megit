@@ -1,0 +1,63 @@
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #1e2228; color: #d4d8de;
+}
+button { background: #2c313a; color: inherit; border: 1px solid #3a404b; border-radius: 4px; cursor: pointer; }
+button:hover { background: #3a404b; }
+
+.app { display: flex; flex-direction: column; height: 100%; }
+.empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #6b7280; }
+.error { color: #e06c75; padding: 8px; white-space: pre-wrap; }
+
+.tabbar { display: flex; gap: 2px; background: #14171c; padding: 6px 6px 0; flex-shrink: 0; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px 6px 0 0; background: #1a1e24; cursor: pointer; }
+.tab.active { background: #2c313a; }
+.tab-close { border: none; background: none; padding: 0 2px; }
+.tab-add { border: none; padding: 6px 12px; background: none; font-size: 15px; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.modal { background: #23272e; border: 1px solid #3a404b; border-radius: 8px; width: 480px; max-height: 70vh; display: flex; flex-direction: column; }
+.modal-head { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid #3a404b; }
+.modal-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9aa4b2; }
+.dirlist { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
+.dirlist li { display: flex; align-items: center; padding: 4px 8px; border-radius: 4px; }
+.dirlist li:hover { background: #2c313a; }
+.dirname { flex: 1; cursor: pointer; }
+
+.repoview { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #23272e; }
+.toolbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #3a404b; flex-shrink: 0; }
+.toolbar button { padding: 3px 10px; }
+.repo-path { flex: 1; color: #9aa4b2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panes { flex: 1; display: flex; min-height: 0; }
+
+.graphview { width: 55%; overflow: auto; border-right: 1px solid #3a404b; padding-bottom: 8px; }
+.row { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
+.row:hover { background: #2c313a; }
+.row.selected { background: #354254; }
+.row.wip { position: sticky; top: 0; background: #2a2e25; z-index: 1; font-style: italic; }
+.row.wip.selected { background: #354254; }
+.graph-cell { flex-shrink: 0; }
+.refs { display: flex; gap: 4px; }
+.ref-chip { border: 1px solid; border-radius: 8px; padding: 0 6px; font-size: 11px; color: #d4d8de; }
+.subject { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.author, .date { color: #9aa4b2; font-size: 12px; }
+.hash { color: #6b7280; font-family: ui-monospace, monospace; font-size: 12px; }
+.load-more { margin: 8px; padding: 4px 14px; }
+
+.panel { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.filelist { max-height: 40%; overflow-y: auto; border-bottom: 1px solid #3a404b; padding: 4px; flex-shrink: 0; }
+.file-row { display: flex; gap: 8px; padding: 3px 8px; cursor: pointer; border-radius: 4px; }
+.file-row:hover { background: #2c313a; }
+.file-row.selected { background: #354254; }
+.file-status { font-family: ui-monospace, monospace; width: 14px; flex-shrink: 0; }
+.file-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.diffview { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; }
+.diffview.empty { align-items: center; justify-content: center; text-align: center; }
+.diff-toolbar { padding: 6px 10px; border-bottom: 1px solid #3a404b; flex-shrink: 0; }
+.diff-toolbar button { padding: 3px 10px; }
+.diff-html { flex: 1; overflow: auto; }
+.diff-plain { padding: 10px; color: #9aa4b2; }
+.d2h-wrapper { --d2h-bg-color: #23272e; }
