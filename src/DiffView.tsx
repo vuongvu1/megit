@@ -6,19 +6,32 @@ import { api } from './api'
 
 type DiffResp = { diff?: string; tooLarge?: boolean; size?: number }
 
-export default function DiffView({ repo, hash, file }: { repo: string; hash: string | null; file: string }) {
+export default function DiffView({ repo, hash, file, wipTick }: { repo: string; hash: string | null; file: string; wipTick: number }) {
   const [resp, setResp] = useState<DiffResp | null>(null)
   const [error, setError] = useState('')
   const [split, setSplit] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const load = (force = false) => {
-    setError('')
-    setResp(null)
+  const load = (force = false, silent = false) => {
+    if (!silent) {
+      setError('')
+      setResp(null)
+    }
     const params = new URLSearchParams({ repo, file, ...(hash ? { hash } : {}), ...(force ? { force: '1' } : {}) })
-    api<DiffResp>(`/api/diff?${params}`).then(setResp).catch(e => setError(e.message))
+    api<DiffResp>(`/api/diff?${params}`)
+      .then(r => { setError(''); setResp(r) })
+      .catch(e => { if (!silent) setError(e.message) })
   }
-  useEffect(() => { load() }, [repo, hash, file])
+  // seenTick: a wipTick that was already current when this file was opened
+  // must not trigger a reload; only later increments do. Commit diffs (hash
+  // set) never reload — same hash, same content.
+  const seenTick = useRef(wipTick)
+  useEffect(() => { seenTick.current = wipTick; load() }, [repo, hash, file])
+  useEffect(() => {
+    if (wipTick === seenTick.current) return
+    seenTick.current = wipTick
+    if (!hash) load(false, true)
+  }, [wipTick])
 
   const plain = !resp?.diff?.trim() || /^Binary files/m.test(resp?.diff ?? '')
 
