@@ -1,2 +1,5 @@
 node_modules
 dist
+.e2e-probe
+.playwright-mcp
+wip-check.yml
