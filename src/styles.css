@@ -68,4 +68,4 @@ button:hover { background: #3a404b; }
 .diff-toolbar button { padding: 3px 10px; }
 .diff-html { flex: 1; overflow: auto; }
 .diff-plain { padding: 10px; color: #9aa4b2; }
-.d2h-wrapper { --d2h-bg-color: #23272e; }
+.d2h-wrapper { --d2h-dark-bg-color: #23272e; }

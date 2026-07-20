@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Diff2HtmlUI } from 'diff2html/lib/ui/js/diff2html-ui.js'
+import { ColorSchemeType } from 'diff2html/lib/types'
 import 'diff2html/bundles/css/diff2html.min.css'
 import 'highlight.js/styles/github-dark.css'
 import { api } from './api'
@@ -42,6 +43,7 @@ export default function DiffView({ repo, hash, file, wipTick }: { repo: string; 
       matching: 'lines',
       highlight: true,
       outputFormat: split ? 'side-by-side' : 'line-by-line',
+      colorScheme: ColorSchemeType.DARK,
     })
     ui.draw()
     ui.highlightCode()
