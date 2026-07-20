@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Commit, StatusEntry } from '../server/parse.ts'
 import { api } from './api'
 import GraphView from './GraphView'
@@ -20,6 +20,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [selection, setSelection] = useState<Selection>(null)
   const [error, setError] = useState<{ msg: string; gone: boolean } | null>(null)
   const [wipTick, setWipTick] = useState(0)
+  const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
 
   const fps = useRef({ graph: '', status: '' })
   const loaded = useRef(0)
@@ -97,6 +98,19 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     return () => window.removeEventListener('keydown', onKey)
   }, [refresh])
 
+  // pointer capture keeps drag events on the splitter — no window listeners to clean up
+  const onSplitDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onSplitMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const r = e.currentTarget.parentElement!.getBoundingClientRect()
+    const pct = Math.min(80, Math.max(20, ((e.clientX - r.left) / r.width) * 100))
+    setGraphPct(pct)
+    localStorage.setItem('megit-split', String(pct))
+  }
+
   const loadMore = useCallback(() => {
     const g = ++gen.current
     api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&skip=${loaded.current}`)
@@ -129,8 +143,9 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         <span className="repo-path">{repo}</span>
         <button onClick={() => refresh()} title="Refresh (r)">⟳ Refresh</button>
       </div>
-      <div className="panes">
+      <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
         <GraphView commits={commits} status={status} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
+        <div className="splitter" onPointerDown={onSplitDown} onPointerMove={onSplitMove} />
         <CommitPanel repo={repo} selection={selection} status={status} wipTick={wipTick} />
       </div>
     </div>

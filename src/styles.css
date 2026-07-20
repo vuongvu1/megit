@@ -33,7 +33,9 @@ button:hover { background: #3a404b; }
 .repo-path { flex: 1; color: #9aa4b2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panes { flex: 1; display: flex; min-height: 0; }
 
-.graphview { width: 55%; overflow: auto; border-right: 1px solid #3a404b; padding-bottom: 8px; }
+.graphview { width: var(--graph-w, 55%); flex-shrink: 0; overflow: auto; padding-bottom: 8px; }
+.splitter { width: 5px; flex-shrink: 0; cursor: col-resize; background: #3a404b; background-clip: padding-box; border: 2px solid transparent; touch-action: none; }
+.splitter:hover, .splitter:active { background-color: #5a80b0; }
 .row { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
 .row:hover { background: #2c313a; }
 .row.selected { background: #354254; }
