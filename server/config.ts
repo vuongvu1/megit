@@ -19,3 +19,10 @@ export function saveConfig(c: Config): void {
   mkdirSync(dir, { recursive: true })
   writeFileSync(file, JSON.stringify(c, null, 2))
 }
+
+export function isPermutation(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const as = [...a].sort()
+  const bs = [...b].sort()
+  return as.every((v, i) => v === bs[i])
+}

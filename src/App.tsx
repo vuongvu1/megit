@@ -20,9 +20,17 @@ export default function App() {
   const close = (repo: string) =>
     api<Config>(`/api/repos?repo=${encodeURIComponent(repo)}`, { method: 'DELETE' }).then(setCfg)
 
+  const reorder = (from: number, to: number) => {
+    const repos = [...cfg.repos]
+    repos.splice(to, 0, ...repos.splice(from, 1))
+    setCfg({ ...cfg, repos })
+  }
+  const reorderEnd = () =>
+    api<Config>('/api/repos/order', jsonInit('PUT', { repos: cfg.repos })).then(setCfg).catch(() => {})
+
   return (
     <div className="app">
-      <TabBar repos={cfg.repos} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} />
+      <TabBar repos={cfg.repos} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} onReorder={reorder} onReorderEnd={reorderEnd} />
       {browsing && <DirBrowser onPicked={c => { setCfg(c); setBrowsing(false) }} onClose={() => setBrowsing(false)} />}
       {cfg.activeRepo
         ? <RepoView key={cfg.activeRepo} repo={cfg.activeRepo} onRemove={() => close(cfg.activeRepo!)} />

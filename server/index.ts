@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { loadConfig, saveConfig } from './config.ts'
+import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { parseLog, parseStatus, LOG_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 
@@ -67,6 +67,18 @@ app.put('/api/active', (req, res) => {
     cfg.activeRepo = repo
     saveConfig(cfg)
   }
+  res.json(cfg)
+})
+
+app.put('/api/repos/order', (req, res) => {
+  const repos = req.body?.repos
+  const cfg = loadConfig()
+  if (!Array.isArray(repos) || !isPermutation(repos, cfg.repos)) {
+    res.status(400).json({ error: 'invalid repo order' })
+    return
+  }
+  cfg.repos = repos
+  saveConfig(cfg)
   res.json(cfg)
 })
 
