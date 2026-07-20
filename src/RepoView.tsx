@@ -3,6 +3,7 @@ import type { Commit, StatusEntry } from '../server/parse.ts'
 import { api } from './api'
 import GraphView from './GraphView'
 import CommitPanel from './CommitPanel'
+import DiffView from './DiffView'
 
 export type Selection = { kind: 'commit'; hash: string } | { kind: 'wip' } | null
 
@@ -18,6 +19,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [hasMore, setHasMore] = useState(false)
   const [status, setStatus] = useState<StatusEntry[]>([])
   const [selection, setSelection] = useState<Selection>(null)
+  const [file, setFile] = useState<string | null>(null)
   const [error, setError] = useState<{ msg: string; gone: boolean } | null>(null)
   const [wipTick, setWipTick] = useState(0)
   const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
@@ -65,6 +67,10 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   }, [q])
 
   useEffect(() => { refresh() }, [refresh])
+
+  // selection identity only changes on a real selection change (refresh returns
+  // the same object when unchanged) — so this closes the diff exactly then
+  useEffect(() => { setFile(null) }, [selection])
 
   // auto-refresh: SSE signal → refetch; hidden tab defers to one refetch on return.
   // refresh's identity only changes with q (both derive from the stable `repo` prop —
@@ -144,9 +150,20 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         <button onClick={() => refresh()} title="Refresh (r)">⟳ Refresh</button>
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
-        <GraphView commits={commits} status={status} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
+        <div className="graph-pane">
+          <GraphView commits={commits} status={status} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
+          {file && selection && (
+            <div className="diff-overlay">
+              <div className="diff-overlay-head">
+                <span className="file-path">{file}</span>
+                <button className="diff-close" onClick={() => setFile(null)} title="Close diff">✕</button>
+              </div>
+              <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file} wipTick={wipTick} />
+            </div>
+          )}
+        </div>
         <div className="splitter" onPointerDown={onSplitDown} onPointerMove={onSplitMove} />
-        <CommitPanel repo={repo} selection={selection} status={status} wipTick={wipTick} />
+        <CommitPanel selection={selection} status={status} repo={repo} file={file} onFileSelect={setFile} />
       </div>
     </div>
   )

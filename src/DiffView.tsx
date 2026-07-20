@@ -9,7 +9,7 @@ type DiffResp = { diff?: string; tooLarge?: boolean; size?: number }
 export default function DiffView({ repo, hash, file, wipTick }: { repo: string; hash: string | null; file: string; wipTick: number }) {
   const [resp, setResp] = useState<DiffResp | null>(null)
   const [error, setError] = useState('')
-  const [split, setSplit] = useState(false)
+  const [split, setSplit] = useState(() => localStorage.getItem('megit-diff-split') === '1')
   const ref = useRef<HTMLDivElement>(null)
 
   const load = (force = false, silent = false) => {
@@ -62,7 +62,7 @@ export default function DiffView({ repo, hash, file, wipTick }: { repo: string; 
   return (
     <div className="diffview">
       <div className="diff-toolbar">
-        <button onClick={() => setSplit(!split)}>{split ? 'Unified' : 'Side-by-side'}</button>
+        <button onClick={() => { setSplit(!split); localStorage.setItem('megit-diff-split', split ? '0' : '1') }}>{split ? 'Unified' : 'Side-by-side'}</button>
       </div>
       {plain
         ? <pre className="diff-plain">{resp.diff?.trim() || 'No changes'}</pre>
