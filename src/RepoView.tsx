@@ -4,6 +4,7 @@ import { api } from './api'
 import GraphView from './GraphView'
 import CommitPanel from './CommitPanel'
 import DiffView from './DiffView'
+import ThemeSwitch from './ThemeSwitch'
 
 export type Selection = { kind: 'commit'; hash: string } | { kind: 'wip' } | null
 
@@ -147,6 +148,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     <div className="repoview">
       <div className="toolbar">
         <span className="repo-path">{repo}</span>
+        <ThemeSwitch />
         <button onClick={() => refresh()} title="Refresh (r)">⟳ Refresh</button>
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>

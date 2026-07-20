@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Diff2HtmlUI } from 'diff2html/lib/ui/js/diff2html-ui.js'
 import { ColorSchemeType } from 'diff2html/lib/types'
 import 'diff2html/bundles/css/diff2html.min.css'
-import 'highlight.js/styles/github-dark.css'
 import { api } from './api'
+import { useTheme } from './theme'
 
 type DiffResp = { diff?: string; tooLarge?: boolean; size?: number }
 
@@ -11,6 +11,7 @@ export default function DiffView({ repo, hash, file, wipTick }: { repo: string; 
   const [resp, setResp] = useState<DiffResp | null>(null)
   const [error, setError] = useState('')
   const [split, setSplit] = useState(() => localStorage.getItem('megit-diff-split') === '1')
+  const theme = useTheme()
   const ref = useRef<HTMLDivElement>(null)
 
   const load = (force = false, silent = false) => {
@@ -43,11 +44,11 @@ export default function DiffView({ repo, hash, file, wipTick }: { repo: string; 
       matching: 'lines',
       highlight: true,
       outputFormat: split ? 'side-by-side' : 'line-by-line',
-      colorScheme: ColorSchemeType.DARK,
+      colorScheme: theme === 'dark' ? ColorSchemeType.DARK : ColorSchemeType.LIGHT,
     })
     ui.draw()
     ui.highlightCode()
-  }, [resp, split, plain])
+  }, [resp, split, plain, theme])
 
   if (error) return <div className="diffview error">{error}</div>
   if (!resp) return <div className="diffview empty">Loading…</div>
