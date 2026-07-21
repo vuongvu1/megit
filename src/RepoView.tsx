@@ -23,6 +23,8 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [file, setFile] = useState<string | null>(null)
   const [error, setError] = useState<{ msg: string; gone: boolean } | null>(null)
   const [wipTick, setWipTick] = useState(0)
+  const [spinning, setSpinning] = useState(false)
+  const inflight = useRef(false)
   const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
 
   const fps = useRef({ graph: '', status: '' })
@@ -33,7 +35,8 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const q = `repo=${encodeURIComponent(repo)}`
 
   const refresh = useCallback((silent = false) => {
-    if (!silent) setError(null)
+    // spin only on manual refresh — silent SSE refetches must not re-render RepoView
+    if (!silent) { setError(null); inflight.current = true; setSpinning(true) }
     const g = ++gen.current
     const limit = Math.max(loaded.current, 500)
     Promise.all([
@@ -41,6 +44,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       api<{ files: StatusEntry[] }>(`/api/status?${q}`),
     ]).then(([gRes, s]) => {
       if (g !== gen.current) return // superseded by a newer request — latest wins
+      inflight.current = false // spin stops at next iteration boundary, never mid-turn
       setError(null)
       const gf = graphFp(gRes.commits, gRes.hasMore)
       if (fps.current.graph !== gf) {
@@ -62,6 +66,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       setWipTick(t => t + 1)
     }).catch(e => {
       if (g !== gen.current) return
+      inflight.current = false
       // background refreshes fail silently — except a gone repo, which must surface
       if (!silent || e.status === 410) setError({ msg: e.message, gone: e.status === 410 })
     })
@@ -149,7 +154,15 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       <div className="toolbar">
         <span className="repo-path">{repo}</span>
         <ThemeSwitch />
-        <button onClick={() => refresh()} title="Refresh (r)">⟳ Refresh</button>
+        <button className="refresh-btn" onClick={() => refresh()} title="Refresh (r)">
+          <svg className={spinning ? 'spin' : undefined} onAnimationIteration={() => { if (!inflight.current) setSpinning(false) }} viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+            <path d="M8 16H3v5" />
+          </svg>
+          Refresh
+        </button>
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
         <div className="graph-pane">

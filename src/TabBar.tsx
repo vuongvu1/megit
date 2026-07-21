@@ -14,6 +14,7 @@ export default function TabBar({ repos, active, onSelect, onAdd, onClose, onReor
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   return (
     <div className="tabbar">
+      <img src="/logo.svg" className="logo" alt="" />
       {repos.map((r, i) => (
         <div
           key={r}

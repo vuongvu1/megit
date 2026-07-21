@@ -1,4 +1,4 @@
-# megit
+# <img src="public/logo.svg" width="28"/> megit
 
 Read-only git repository viewer in the browser: commit graph with branch lanes, tabs for multiple repos, and diffs (unified or side-by-side) — including your uncommitted WIP.
 

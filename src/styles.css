@@ -39,6 +39,7 @@ button:hover { background: var(--border); }
 .error { color: #e06c75; padding: 8px; white-space: pre-wrap; }
 
 .tabbar { display: flex; gap: 2px; background: var(--bg-tabbar); padding: 6px 6px 0; flex-shrink: 0; }
+.logo { width: 18px; height: 18px; align-self: center; margin: 0 4px 6px 2px; pointer-events: none; }
 .tab { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px 6px 0 0; background: var(--bg-tab); cursor: pointer; }
 .tab.active { background: var(--bg-panel); }
 .tab.dragging { opacity: 0.5; }
@@ -57,6 +58,9 @@ button:hover { background: var(--border); }
 .repoview { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); }
 .toolbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .toolbar button { padding: 3px 10px; }
+.refresh-btn { display: inline-flex; align-items: center; gap: 5px; }
+.refresh-btn .spin { animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .repo-path { flex: 1; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .theme-switch { position: relative; display: inline-flex; align-items: center; justify-content: space-between; width: 40px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--bg-hover); border: 1px solid var(--border); color: var(--fg-dim); cursor: pointer; flex-shrink: 0; }
 .theme-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
