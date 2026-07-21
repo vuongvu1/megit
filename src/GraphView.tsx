@@ -138,7 +138,7 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes }: {
 const fmtDate = (unix: number) =>
   new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 
-function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes }: {
+function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, onBusy }: {
   repo: string
   c: Commit
   row: LaneRow
@@ -147,6 +147,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes }:
   selected: boolean
   onSelect: () => void
   dashes: Dash[]
+  onBusy: (p: Promise<unknown>) => void
 }) {
   const isMerge = c.parents.length > 1
   const avatarUrl = useAvatar(repo, isMerge ? null : c.email)
@@ -163,11 +164,11 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes }:
             style={{ borderColor: color(row.lane) }}
             title={canCheckout ? `${chip.name} — double-click to checkout` : chip.name}
             onDoubleClick={canCheckout ? () => {
-              // success needs no refetch: HEAD change hits fs.watch → SSE → auto-refresh
+              // onBusy refetches on settle; the later fs.watch → SSE refresh is a fingerprint no-op
               type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number }
               const checkout = (body: object) =>
                 api<CheckoutRes>(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
-              checkout({ branch: chip.name })
+              onBusy(checkout({ branch: chip.name })
                 .then(r => {
                   if (!r.diverged) return
                   // ponytail: native confirm as the popup; custom modal when it grates
@@ -177,7 +178,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes }:
                   )
                   if (ok) return checkout({ branch: chip.name, reset: true })
                 })
-                .catch(err => alert(`Checkout failed:\n${(err as Error).message}`)) // ponytail: alert; inline toast if it grates
+                .catch(err => alert(`Checkout failed:\n${(err as Error).message}`))) // ponytail: alert; inline toast if it grates
             } : undefined}
           >
             {chip.head && <CheckIcon />}
@@ -254,7 +255,7 @@ function StashRow({ s, lane, passRow, width, wipLane, selected, onSelect }: {
   )
 }
 
-function GraphView({ repo, commits, status, remotes, stashes, selection, onSelect, onLoadMore, hasMore }: {
+function GraphView({ repo, commits, status, remotes, stashes, selection, onSelect, onLoadMore, hasMore, onBusy }: {
   repo: string
   commits: Commit[]
   status: StatusEntry[]
@@ -264,6 +265,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   onSelect: (s: Selection) => void
   onLoadMore: () => void
   hasMore: boolean
+  onBusy: (p: Promise<unknown>) => void
 }) {
   const { rows, maxLanes } = useMemo(() => layout(commits), [commits])
   const width = Math.max(maxLanes, 1) * COL
@@ -338,6 +340,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
               selected={selection?.kind === 'commit' && selection.hash === c.hash}
               onSelect={() => onSelect({ kind: 'commit', hash: c.hash })}
               dashes={dashesFor(i)}
+              onBusy={onBusy}
             />
           </Fragment>
         )

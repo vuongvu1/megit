@@ -80,6 +80,14 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
 
   useEffect(() => { refresh() }, [refresh])
 
+  // spin the toolbar refresh icon while an arbitrary async action (e.g. checkout) runs,
+  // then refetch immediately — beats the fs.watch → SSE → 400ms-debounce round-trip
+  const spinWhile = useCallback((p: Promise<unknown>) => {
+    inflight.current = true
+    setSpinning(true)
+    p.finally(() => refresh())
+  }, [refresh])
+
   // selection identity only changes on a real selection change (refresh returns
   // the same object when unchanged) — so this closes the diff exactly then
   useEffect(() => { setFile(null) }, [selection])
@@ -174,20 +182,19 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     <div className="repoview">
       <div className="toolbar">
         <span className="repo-path">{repo}</span>
-        <ThemeSwitch />
-        <button className="refresh-btn" onClick={() => refresh()} title="Refresh (r)">
-          <svg className={spinning ? 'spin' : undefined} onAnimationIteration={() => { if (!inflight.current) setSpinning(false) }} viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <button className="refresh-btn" onClick={() => refresh()} title="Refresh (r)" aria-label="Refresh">
+          <svg className={spinning ? 'spin' : undefined} onAnimationIteration={() => { if (!inflight.current) setSpinning(false) }} viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
             <path d="M21 3v5h-5" />
             <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
             <path d="M8 16H3v5" />
           </svg>
-          Refresh
         </button>
+        <ThemeSwitch />
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
         <div className="graph-pane" style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
-          <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
+          <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} />
           <div className="col-splitter" style={{ left: refsW + 9 }} onPointerDown={onSplitDown} onPointerMove={onRefsMove} />
           <div className="col-splitter" style={{ left: refsW + graphColW + 17 }} onPointerDown={onSplitDown} onPointerMove={onGraphColMove} />
           {file && selection && (
