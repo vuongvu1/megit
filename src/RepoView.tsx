@@ -27,6 +27,8 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [spinning, setSpinning] = useState(false)
   const inflight = useRef(false)
   const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
+  const [refsW, setRefsW] = useState(() => Number(localStorage.getItem('megit-refs-w')) || 120)
+  const [graphColW, setGraphColW] = useState(() => Number(localStorage.getItem('megit-graph-col')) || 90)
 
   const fps = useRef({ graph: '', status: '' })
   const loaded = useRef(0)
@@ -124,6 +126,21 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     setGraphPct(pct)
     localStorage.setItem('megit-split', String(pct))
   }
+  // column splitters overlay the pane; row geometry: 8px padding + refs + 8px gap + graph + 8px gap
+  const onRefsMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const r = e.currentTarget.parentElement!.getBoundingClientRect()
+    const w = Math.min(400, Math.max(40, e.clientX - r.left - 12))
+    setRefsW(w)
+    localStorage.setItem('megit-refs-w', String(w))
+  }
+  const onGraphColMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const r = e.currentTarget.parentElement!.getBoundingClientRect()
+    const w = Math.min(500, Math.max(24, e.clientX - r.left - refsW - 20))
+    setGraphColW(w)
+    localStorage.setItem('megit-graph-col', String(w))
+  }
 
   const loadMore = useCallback(() => {
     const g = ++gen.current
@@ -167,8 +184,10 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         </button>
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
-        <div className="graph-pane">
+        <div className="graph-pane" style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
           <GraphView repo={repo} commits={commits} status={status} remotes={remotes} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
+          <div className="col-splitter" style={{ left: refsW + 9 }} onPointerDown={onSplitDown} onPointerMove={onRefsMove} />
+          <div className="col-splitter" style={{ left: refsW + graphColW + 17 }} onPointerDown={onSplitDown} onPointerMove={onGraphColMove} />
           {file && selection && (
             <div className="diff-overlay">
               <div className="diff-overlay-head">

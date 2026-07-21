@@ -154,14 +154,28 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect }: {
             title={chip.name}
           >
             {chip.head && <CheckIcon />}
+            <span className="ref-name">{chip.name}</span>
             {chip.tag && <TagIcon />}
             {chip.local && !chip.tag && <LocalIcon />}
             {chip.remote && <RemoteIcon />}
-            <span className="ref-name">{chip.name}</span>
           </span>
         ))}
+        {chips.length > 0 && <span className="ref-line" style={{ background: color(row.lane) }} />}
       </span>
-      <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} />
+      {chips.length > 0 && (
+        // bridge: refs edge → commit dot; svg centering offset re-derived from the same CSS vars
+        <span
+          className="ref-bridge"
+          style={{
+            background: color(row.lane),
+            left: 'calc(8px + var(--refs-w, 120px))',
+            width: `min(calc(8px + max(3px, (var(--graph-col-w, 90px) - ${width}px) / 2) + ${row.lane * COL + COL / 2 - (isMerge ? 4 : AV_R)}px), calc(8px + var(--graph-col-w, 90px)))`,
+          }}
+        />
+      )}
+      <span className="graph-col">
+        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} />
+      </span>
       <span className="subject" title={c.subject}>{c.subject}</span>
       <span className="author">{c.author}</span>
       <span className="date">{fmtDate(c.date)}</span>
@@ -188,9 +202,11 @@ function GraphView({ repo, commits, status, remotes, selection, onSelect, onLoad
       {status.length > 0 && (
         <div className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`} onClick={() => onSelect({ kind: 'wip' })}>
           <span className="refs" />
-          <svg width={width} height={ROW} className="graph-cell">
-            <circle cx={COL / 2} cy={ROW / 2} r="4" fill="none" stroke="#e5c07b" strokeWidth="2" />
-          </svg>
+          <span className="graph-col">
+            <svg width={width} height={ROW} className="graph-cell">
+              <circle cx={COL / 2} cy={ROW / 2} r="4" fill="none" stroke="#e5c07b" strokeWidth="2" />
+            </svg>
+          </span>
           <span className="subject">{status.length} uncommitted change{status.length > 1 ? 's' : ''}</span>
         </div>
       )}
