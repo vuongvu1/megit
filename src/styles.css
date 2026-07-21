@@ -111,4 +111,38 @@ button:hover { background: var(--border); }
 .diff-html { flex: 1; overflow: auto; }
 .diff-html .d2h-diff-table { font-family: 'Ubuntu Mono', ui-monospace, monospace; }
 .diff-plain { padding: 10px; color: var(--fg-dim); }
-.d2h-wrapper { --d2h-bg-color: var(--bg-panel); --d2h-dark-bg-color: #23272e; }
+/* GitHub (Primer) diff palette */
+.d2h-wrapper {
+  --d2h-bg-color: var(--bg-panel);
+  --d2h-ins-bg-color: #e6ffec;
+  --d2h-ins-highlight-bg-color: #abf2bc;
+  --d2h-ins-border-color: #ccffd8;
+  --d2h-ins-label-color: #1a7f37;
+  --d2h-del-bg-color: #ffebe9;
+  --d2h-del-highlight-bg-color: #ffcecb;
+  --d2h-del-border-color: #ffd7d5;
+  --d2h-del-label-color: #cf222e;
+  --d2h-change-ins-color: #e6ffec;
+  --d2h-change-del-color: #ffebe9;
+  --d2h-info-bg-color: #ddf4ff;
+  --d2h-info-border-color: #ddf4ff;
+  --d2h-line-border-color: #d0d7de;
+
+  --d2h-dark-bg-color: #23272e;
+  --d2h-dark-border-color: #30363d;
+  --d2h-dark-line-border-color: #30363d;
+  --d2h-dark-ins-bg-color: rgba(46, 160, 67, 0.15);
+  --d2h-dark-ins-highlight-bg-color: rgba(46, 160, 67, 0.4);
+  --d2h-dark-ins-border-color: rgba(63, 185, 80, 0.3);
+  --d2h-dark-ins-label-color: #3fb950;
+  --d2h-dark-del-bg-color: rgba(248, 81, 73, 0.1);
+  --d2h-dark-del-highlight-bg-color: rgba(248, 81, 73, 0.4);
+  --d2h-dark-del-border-color: rgba(248, 81, 73, 0.3);
+  --d2h-dark-del-label-color: #f85149;
+  --d2h-dark-change-ins-color: rgba(46, 160, 67, 0.15);
+  --d2h-dark-change-del-color: rgba(248, 81, 73, 0.1);
+  --d2h-dark-info-bg-color: rgba(56, 139, 253, 0.1);
+  --d2h-dark-info-border-color: rgba(56, 139, 253, 0.3);
+}
+/* hljs themes set an opaque .hljs background that hides d2h row tints */
+.d2h-wrapper .hljs { background: transparent; }
