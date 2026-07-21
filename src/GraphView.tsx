@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react'
 import type { Commit, StatusEntry } from '../server/parse.ts'
+import { api, jsonInit } from './api'
 import { layout, type LaneRow } from './lanes'
 import type { Selection } from './RepoView'
 import { useAvatar, initials } from './avatar'
@@ -146,12 +147,19 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect }: {
   return (
     <div className={`row${selected ? ' selected' : ''}`} onClick={onSelect}>
       <span className="refs">
-        {chips.map(chip => (
+        {chips.map(chip => {
+          const canCheckout = !chip.head && !chip.tag && (chip.local || chip.remote)
+          return (
           <span
             key={chip.name}
             className={`ref-chip${chip.head ? ' head' : ''}`}
             style={{ borderColor: color(row.lane) }}
-            title={chip.name}
+            title={canCheckout ? `${chip.name} — double-click to checkout` : chip.name}
+            onDoubleClick={canCheckout ? () => {
+              // success needs no refetch: HEAD change hits fs.watch → SSE → auto-refresh
+              api(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', { branch: chip.name }))
+                .catch(err => alert(`Checkout failed:\n${(err as Error).message}`)) // ponytail: alert; inline toast if it grates
+            } : undefined}
           >
             {chip.head && <CheckIcon />}
             <span className="ref-name">{chip.name}</span>
@@ -159,7 +167,8 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect }: {
             {chip.local && !chip.tag && <LocalIcon />}
             {chip.remote && <RemoteIcon />}
           </span>
-        ))}
+          )
+        })}
         {chips.length > 0 && <span className="ref-line" style={{ background: color(row.lane) }} />}
       </span>
       {chips.length > 0 && (

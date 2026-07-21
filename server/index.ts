@@ -139,6 +139,22 @@ app.get('/api/status', repoGuard, async (req, res) => {
   }
 })
 
+app.post('/api/checkout', repoGuard, async (req, res) => {
+  const branch = String(req.body.branch ?? '')
+  // reject option-like names so the branch can never be parsed as a git flag
+  if (!branch || branch.startsWith('-')) {
+    res.status(400).json({ error: 'invalid branch name' })
+    return
+  }
+  try {
+    // plain `checkout <name>` DWIMs a remote-only branch into a local tracking branch
+    await git(String(req.query.repo), ['checkout', branch])
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(409).json({ error: (e as Error).message })
+  }
+})
+
 app.get('/api/events', repoGuard, (req, res) => {
   const repo = String(req.query.repo)
   res.writeHead(200, {

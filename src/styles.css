@@ -11,6 +11,7 @@
   --fg-dim: #9aa4b2;
   --fg-faint: #6b7280;
   --head-bg: #2e4436;
+  --head-bg-hover: #3d5a47;
   --head-fg: #a8d99a;
 }
 :root[data-theme="light"] {
@@ -26,6 +27,7 @@
   --fg-dim: #57606a;
   --fg-faint: #8b949e;
   --head-bg: #d3f2d9;
+  --head-bg-hover: #b4e7c0;
   --head-fg: #116329;
 }
 
@@ -94,8 +96,10 @@ button:hover { background: var(--border); }
 .graph-col { display: flex; align-items: center; justify-content: safe center; width: var(--graph-col-w, 90px); padding: 0 3px; flex-shrink: 0; overflow: hidden; align-self: stretch; }
 .col-splitter { position: absolute; top: 0; bottom: 0; width: 5px; cursor: col-resize; touch-action: none; z-index: 1; }
 .col-splitter:hover, .col-splitter:active { background: #5a80b0; }
-.ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 12px; color: var(--fg); background: var(--bg-panel); min-width: 0; }
+.ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 12px; color: var(--fg); background: var(--bg-panel); min-width: 0; user-select: none; }
+.ref-chip:hover { background: var(--bg-hover); }
 .ref-chip.head { font-weight: 600; background: var(--head-bg); color: var(--head-fg); }
+.ref-chip.head:hover { background: var(--head-bg-hover); }
 .ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 /* connector: .ref-line fills refs column after last chip; .ref-bridge continues across the gap to the commit dot */
 .ref-line { flex: 1; height: 1px; min-width: 6px; align-self: center; opacity: .5; }
