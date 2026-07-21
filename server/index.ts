@@ -96,7 +96,7 @@ app.get('/api/fs', (req, res) => {
     .map(e => ({ name: e.name, path: join(path, e.name), isRepo: existsSync(join(path, e.name, '.git')) }))
     .sort((a, b) => a.name.localeCompare(b.name))
   const parent = dirname(path)
-  res.json({ path, parent: parent === path ? null : parent, dirs })
+  res.json({ path, parent: parent === path ? null : parent, dirs, isRepo: existsSync(join(path, '.git')) })
 })
 
 app.get('/api/graph', repoGuard, async (req, res) => {
