@@ -139,17 +139,55 @@ app.get('/api/status', repoGuard, async (req, res) => {
   }
 })
 
+// resolves to a sha, or null when the ref doesn't exist (--quiet: exit 1, empty output)
+async function revParse(repo: string, ref: string): Promise<string | null> {
+  const out = await git(repo, ['rev-parse', '--verify', '--quiet', ref], [0, 1])
+  return out.trim() || null
+}
+
 app.post('/api/checkout', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
   const branch = String(req.body.branch ?? '')
+  const reset = req.body.reset === true
   // reject option-like names so the branch can never be parsed as a git flag
   if (!branch || branch.startsWith('-')) {
     res.status(400).json({ error: 'invalid branch name' })
     return
   }
   try {
-    // plain `checkout <name>` DWIMs a remote-only branch into a local tracking branch
-    await git(String(req.query.repo), ['checkout', branch])
-    res.json({ ok: true })
+    const remotes = (await git(repo, ['remote'])).split('\n').filter(Boolean)
+    let remoteRef: string | null = null
+    for (const r of remotes) {
+      if (await revParse(repo, `refs/remotes/${r}/${branch}`)) {
+        remoteRef = `${r}/${branch}`
+        break
+      }
+    }
+    const hasLocal = !!(await revParse(repo, `refs/heads/${branch}`))
+    if (!remoteRef || !hasLocal) {
+      // plain `checkout <name>` DWIMs a remote-only branch into a local tracking branch
+      await git(repo, ['checkout', branch])
+      res.json({ ok: true })
+      return
+    }
+    const localOnly = Number((await git(repo, ['rev-list', '--count', `${remoteRef}..refs/heads/${branch}`])).trim())
+    const remoteOnly = Number((await git(repo, ['rev-list', '--count', `refs/heads/${branch}..${remoteRef}`])).trim())
+    if (localOnly === 0) {
+      // equal or strictly behind: checkout, then fast-forward to the remote
+      await git(repo, ['checkout', branch])
+      if (remoteOnly > 0) await git(repo, ['merge', '--ff-only', remoteRef])
+      res.json({ ok: true, forwarded: remoteOnly })
+      return
+    }
+    if (!reset) {
+      // diverged (or ahead): the client asks the user before anything destructive
+      res.json({ diverged: true, remoteRef, ahead: localOnly, behind: remoteOnly })
+      return
+    }
+    const dirty = (await git(repo, ['status', '--porcelain'])).trim() !== ''
+    if (dirty) await git(repo, ['stash', 'push', '-u', '-m', `megit: ${branch} before reset to ${remoteRef}`])
+    await git(repo, ['checkout', '-B', branch, remoteRef])
+    res.json({ ok: true, reset: true, stashed: dirty })
   } catch (e) {
     res.status(409).json({ error: (e as Error).message })
   }

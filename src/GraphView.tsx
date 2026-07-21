@@ -76,12 +76,14 @@ const CheckIcon = () => (
   </svg>
 )
 
-function GraphCell({ row, width, avatarUrl, label, clipId }: {
+function GraphCell({ row, width, avatarUrl, label, clipId, dashLane, dashEnd }: {
   row: LaneRow
   width: number
   avatarUrl: string | null
   label: string | null // author initials; null = merge commit → plain dot
   clipId: string
+  dashLane: number | null // WIP → HEAD connector passing through (or ending in) this row
+  dashEnd: boolean
 }) {
   const x = (l: number) => l * COL + COL / 2
   const mid = ROW / 2
@@ -89,6 +91,9 @@ function GraphCell({ row, width, avatarUrl, label, clipId }: {
   const c = color(row.lane)
   return (
     <svg width={width} height={ROW} className="graph-cell">
+      {dashLane != null && (
+        <line x1={x(dashLane)} y1={0} x2={x(dashLane)} y2={dashEnd ? mid : ROW} stroke={color(dashLane)} strokeWidth="2" strokeDasharray="2 3" />
+      )}
       {row.through.map(l => <line key={`t${l}`} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} strokeWidth="2" />)}
       {row.incoming.map(l => (
         <path key={`i${l}`} d={`M ${x(l)} 0 C ${x(l)} ${mid}, ${x(row.lane)} 0, ${x(row.lane)} ${mid}`} stroke={color(l)} strokeWidth="2" fill="none" />
@@ -132,7 +137,7 @@ function GraphCell({ row, width, avatarUrl, label, clipId }: {
 const fmtDate = (unix: number) =>
   new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 
-function CommitRow({ repo, c, row, width, remotes, selected, onSelect }: {
+function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashLane, dashEnd }: {
   repo: string
   c: Commit
   row: LaneRow
@@ -140,6 +145,8 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect }: {
   remotes: string[]
   selected: boolean
   onSelect: () => void
+  dashLane: number | null
+  dashEnd: boolean
 }) {
   const isMerge = c.parents.length > 1
   const avatarUrl = useAvatar(repo, isMerge ? null : c.email)
@@ -157,7 +164,19 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect }: {
             title={canCheckout ? `${chip.name} — double-click to checkout` : chip.name}
             onDoubleClick={canCheckout ? () => {
               // success needs no refetch: HEAD change hits fs.watch → SSE → auto-refresh
-              api(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', { branch: chip.name }))
+              type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number }
+              const checkout = (body: object) =>
+                api<CheckoutRes>(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
+              checkout({ branch: chip.name })
+                .then(r => {
+                  if (!r.diverged) return
+                  // ponytail: native confirm as the popup; custom modal when it grates
+                  const ok = confirm(
+                    `Local '${chip.name}' differs from ${r.remoteRef} (${r.ahead} ahead, ${r.behind} behind).\n\n` +
+                    `OK — Reset local to ${r.remoteRef} (uncommitted changes go to a stash)\nCancel — keep everything as is`,
+                  )
+                  if (ok) return checkout({ branch: chip.name, reset: true })
+                })
                 .catch(err => alert(`Checkout failed:\n${(err as Error).message}`)) // ponytail: alert; inline toast if it grates
             } : undefined}
           >
@@ -183,7 +202,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect }: {
         />
       )}
       <span className="graph-col">
-        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} />
+        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} dashLane={dashLane} dashEnd={dashEnd} />
       </span>
       <span className="subject" title={c.subject}>{c.subject}</span>
       <span className="author">{c.author}</span>
@@ -205,15 +224,22 @@ function GraphView({ repo, commits, status, remotes, selection, onSelect, onLoad
 }) {
   const { rows, maxLanes } = useMemo(() => layout(commits), [commits])
   const width = Math.max(maxLanes, 1) * COL
+  // WIP row connects to the commit HEAD points at, on that commit's lane (GitKraken-style)
+  const headIdx = useMemo(() => commits.findIndex(c => c.refs.some(r => r === 'HEAD' || r.startsWith('HEAD -> '))), [commits])
+  const showWip = status.length > 0
+  const headLane = headIdx >= 0 ? rows[headIdx].lane : 0
+  const hx = headLane * COL + COL / 2
+  const hc = color(headLane)
 
   return (
     <div className="graphview">
-      {status.length > 0 && (
+      {showWip && (
         <div className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`} onClick={() => onSelect({ kind: 'wip' })}>
           <span className="refs" />
           <span className="graph-col">
             <svg width={width} height={ROW} className="graph-cell">
-              <circle cx={COL / 2} cy={ROW / 2} r="4" fill="none" stroke="#e5c07b" strokeWidth="2" />
+              {headIdx >= 0 && <line x1={hx} y1={ROW / 2 + AV_R + 1} x2={hx} y2={ROW} stroke={hc} strokeWidth="2" strokeDasharray="2 3" />}
+              <circle cx={hx} cy={ROW / 2} r={AV_R} fill="none" stroke={hc} strokeWidth="1.5" strokeDasharray="3 3" />
             </svg>
           </span>
           <span className="subject">{status.length} uncommitted change{status.length > 1 ? 's' : ''}</span>
@@ -229,6 +255,8 @@ function GraphView({ repo, commits, status, remotes, selection, onSelect, onLoad
           remotes={remotes}
           selected={selection?.kind === 'commit' && selection.hash === c.hash}
           onSelect={() => onSelect({ kind: 'commit', hash: c.hash })}
+          dashLane={showWip && headIdx >= 0 && i <= headIdx ? headLane : null}
+          dashEnd={i === headIdx}
         />
       ))}
       {hasMore && <button className="load-more" onClick={onLoadMore}>Load more</button>}
