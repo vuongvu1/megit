@@ -83,9 +83,13 @@ button:hover { background: var(--border); }
 .row.selected { background: var(--bg-selected); }
 .row.wip { position: sticky; top: 0; background: var(--bg-wip); z-index: 1; font-style: italic; }
 .row.wip.selected { background: var(--bg-selected); }
-.graph-cell { flex-shrink: 0; }
-.refs { display: flex; gap: 4px; }
-.ref-chip { border: 1px solid; border-radius: 8px; padding: 0 6px; font-size: 11px; color: var(--fg); }
+.graph-cell { flex-shrink: 0; overflow: visible; }
+/* uniform width per row keeps graph lanes vertically aligned; % of pane so narrow panes keep the subject visible */
+.refs { display: flex; gap: 4px; width: clamp(64px, 20%, 150px); flex-shrink: 0; justify-content: flex-end; overflow: hidden; }
+.ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 11px; color: var(--fg); background: var(--bg-panel); min-width: 0; }
+.ref-chip.head { font-weight: 600; }
+.ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+.ref-icon { flex-shrink: 0; opacity: 0.8; }
 .subject { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .author, .date { color: var(--fg-dim); font-size: 12px; }
 .hash { color: var(--fg-faint); font-family: 'Ubuntu Mono', ui-monospace, monospace; font-size: 12px; }

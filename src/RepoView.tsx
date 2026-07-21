@@ -18,6 +18,7 @@ const statusFp = (files: StatusEntry[]) => files.map(f => f.status + f.path).joi
 export default function RepoView({ repo, onRemove }: { repo: string; onRemove: () => void }) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [hasMore, setHasMore] = useState(false)
+  const [remotes, setRemotes] = useState<string[]>([])
   const [status, setStatus] = useState<StatusEntry[]>([])
   const [selection, setSelection] = useState<Selection>(null)
   const [file, setFile] = useState<string | null>(null)
@@ -40,7 +41,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     const g = ++gen.current
     const limit = Math.max(loaded.current, 500)
     Promise.all([
-      api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&limit=${limit}`),
+      api<{ commits: Commit[]; hasMore: boolean; remotes: string[] }>(`/api/graph?${q}&limit=${limit}`),
       api<{ files: StatusEntry[] }>(`/api/status?${q}`),
     ]).then(([gRes, s]) => {
       if (g !== gen.current) return // superseded by a newer request — latest wins
@@ -51,6 +52,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         fps.current.graph = gf
         setCommits(gRes.commits)
         setHasMore(gRes.hasMore)
+        setRemotes(gRes.remotes)
         // commit rewritten away (rebase/amend) → back to initial-load selection
         setSelection(sel =>
           sel?.kind === 'commit' && !gRes.commits.some(c => c.hash === sel.hash) ? null : sel)
@@ -166,7 +168,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
         <div className="graph-pane">
-          <GraphView commits={commits} status={status} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
+          <GraphView repo={repo} commits={commits} status={status} remotes={remotes} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
           {file && selection && (
             <div className="diff-overlay">
               <div className="diff-overlay-head">

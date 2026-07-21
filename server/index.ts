@@ -5,6 +5,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
+import { resolveAvatar } from './avatars.ts'
 import { parseLog, parseStatus, LOG_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 
@@ -104,17 +105,30 @@ app.get('/api/graph', repoGuard, async (req, res) => {
   const skip = Number(req.query.skip) || 0
   const limit = Math.max(1, Number(req.query.limit) || 500)
   try {
-    const raw = await git(repo, ['log', '--all', '--topo-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`])
+    const [raw, remoteRaw] = await Promise.all([
+      git(repo, ['log', '--all', '--topo-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
+      git(repo, ['remote']),
+    ])
     const commits = parseLog(raw)
-    res.json({ commits: commits.slice(0, limit), hasMore: commits.length > limit })
+    const remotes = remoteRaw.split('\n').filter(Boolean)
+    res.json({ commits: commits.slice(0, limit), hasMore: commits.length > limit, remotes })
   } catch (e) {
     const msg = (e as Error).message
     if (/does not have any commits yet/.test(msg)) {
-      res.json({ commits: [], hasMore: false })
+      res.json({ commits: [], hasMore: false, remotes: [] })
       return
     }
     res.status(500).json({ error: msg })
   }
+})
+
+app.get('/api/avatar', repoGuard, async (req, res) => {
+  const email = String(req.query.email ?? '')
+  if (!email) {
+    res.status(400).json({ error: 'email required' })
+    return
+  }
+  res.json({ url: await resolveAvatar(String(req.query.repo), email, git) })
 })
 
 app.get('/api/status', repoGuard, async (req, res) => {

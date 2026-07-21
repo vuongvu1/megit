@@ -2,6 +2,7 @@ export type Commit = {
   hash: string
   parents: string[]
   author: string
+  email: string
   date: number
   refs: string[]
   subject: string
@@ -10,7 +11,7 @@ export type Commit = {
 export type StatusEntry = { path: string; status: string }
 
 // \x1f field sep, \x1e record sep — never appear in git metadata
-export const LOG_FORMAT = '%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x1e'
+export const LOG_FORMAT = '%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%D%x1f%s%x1e'
 
 export function parseLog(raw: string): Commit[] {
   return raw
@@ -18,11 +19,12 @@ export function parseLog(raw: string): Commit[] {
     .map(r => r.replace(/^\n/, ''))
     .filter(r => r.length > 0)
     .map(rec => {
-      const [hash, parents, author, date, refs, subject] = rec.split('\x1f')
+      const [hash, parents, author, email, date, refs, subject] = rec.split('\x1f')
       return {
         hash,
         parents: parents ? parents.split(' ') : [],
         author,
+        email,
         date: Number(date),
         refs: refs ? refs.split(', ') : [],
         subject,

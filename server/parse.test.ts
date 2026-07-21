@@ -7,11 +7,11 @@ const R = '\x1e'
 describe('parseLog', () => {
   it('parses records with refs and parents', () => {
     const raw =
-      `aaa${F}bbb ccc${F}Vu${F}1750000000${F}HEAD -> main, origin/main${F}merge stuff${R}\n` +
-      `bbb${F}${F}Vu${F}1749999999${F}${F}initial${R}\n`
+      `aaa${F}bbb ccc${F}Vu${F}vu@example.com${F}1750000000${F}HEAD -> main, origin/main${F}merge stuff${R}\n` +
+      `bbb${F}${F}Vu${F}vu@example.com${F}1749999999${F}${F}initial${R}\n`
     expect(parseLog(raw)).toEqual([
-      { hash: 'aaa', parents: ['bbb', 'ccc'], author: 'Vu', date: 1750000000, refs: ['HEAD -> main', 'origin/main'], subject: 'merge stuff' },
-      { hash: 'bbb', parents: [], author: 'Vu', date: 1749999999, refs: [], subject: 'initial' },
+      { hash: 'aaa', parents: ['bbb', 'ccc'], author: 'Vu', email: 'vu@example.com', date: 1750000000, refs: ['HEAD -> main', 'origin/main'], subject: 'merge stuff' },
+      { hash: 'bbb', parents: [], author: 'Vu', email: 'vu@example.com', date: 1749999999, refs: [], subject: 'initial' },
     ])
   })
 
