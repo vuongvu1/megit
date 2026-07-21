@@ -105,13 +105,21 @@ app.get('/api/graph', repoGuard, async (req, res) => {
   const skip = Number(req.query.skip) || 0
   const limit = Math.max(1, Number(req.query.limit) || 500)
   try {
+    const stashRaw = await git(repo, ['stash', 'list', '--format=%H%x1f%P%x1f%at%x1f%s']).catch(() => '')
+    const stashes = stashRaw.split('\n').filter(Boolean).map(l => {
+      const [hash, parents, date, subject] = l.split('\x1f')
+      return { hash, parent: parents.split(' ')[0], date: Number(date), subject }
+    })
     const [raw, remoteRaw] = await Promise.all([
-      git(repo, ['log', '--all', '--topo-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
+      // --exclude before --all: stash commits render as dedicated stash rows, not log rows.
+      // Stash bases are added as explicit tips — a reset/dropped branch can leave a base
+      // reachable only through its stash, and it must still show in the graph.
+      git(repo, ['log', '--exclude=refs/stash', '--all', ...stashes.map(s => s.parent), '--topo-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
       git(repo, ['remote']),
     ])
     const commits = parseLog(raw)
     const remotes = remoteRaw.split('\n').filter(Boolean)
-    res.json({ commits: commits.slice(0, limit), hasMore: commits.length > limit, remotes })
+    res.json({ commits: commits.slice(0, limit), hasMore: commits.length > limit, remotes, stashes })
   } catch (e) {
     const msg = (e as Error).message
     if (/does not have any commits yet/.test(msg)) {

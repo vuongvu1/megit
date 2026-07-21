@@ -9,6 +9,7 @@ export type Commit = {
 }
 
 export type StatusEntry = { path: string; status: string }
+export type StashEntry = { hash: string; parent: string; date: number; subject: string }
 
 // \x1f field sep, \x1e record sep — never appear in git metadata
 export const LOG_FORMAT = '%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%D%x1f%s%x1e'

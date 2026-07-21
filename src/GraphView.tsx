@@ -1,5 +1,5 @@
-import { memo, useMemo } from 'react'
-import type { Commit, StatusEntry } from '../server/parse.ts'
+import { Fragment, memo, useMemo } from 'react'
+import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
 import { layout, type LaneRow } from './lanes'
 import type { Selection } from './RepoView'
@@ -76,14 +76,15 @@ const CheckIcon = () => (
   </svg>
 )
 
-function GraphCell({ row, width, avatarUrl, label, clipId, dashLane, dashEnd }: {
+type Dash = { lane: number; end: boolean } // WIP/stash connector passing through (end: terminates at this row's dot)
+
+function GraphCell({ row, width, avatarUrl, label, clipId, dashes }: {
   row: LaneRow
   width: number
   avatarUrl: string | null
   label: string | null // author initials; null = merge commit → plain dot
   clipId: string
-  dashLane: number | null // WIP → HEAD connector passing through (or ending in) this row
-  dashEnd: boolean
+  dashes: Dash[]
 }) {
   const x = (l: number) => l * COL + COL / 2
   const mid = ROW / 2
@@ -91,9 +92,9 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashLane, dashEnd }: 
   const c = color(row.lane)
   return (
     <svg width={width} height={ROW} className="graph-cell">
-      {dashLane != null && (
-        <line x1={x(dashLane)} y1={0} x2={x(dashLane)} y2={dashEnd ? mid : ROW} stroke={color(dashLane)} strokeWidth="2" strokeDasharray="2 3" />
-      )}
+      {dashes.map((d, i) => (
+        <line key={`d${i}`} x1={x(d.lane)} y1={0} x2={x(d.lane)} y2={d.end ? mid : ROW} stroke={color(d.lane)} strokeWidth="2" strokeDasharray="2 3" />
+      ))}
       {row.through.map(l => <line key={`t${l}`} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} strokeWidth="2" />)}
       {row.incoming.map(l => (
         <path key={`i${l}`} d={`M ${x(l)} 0 C ${x(l)} ${mid}, ${x(row.lane)} 0, ${x(row.lane)} ${mid}`} stroke={color(l)} strokeWidth="2" fill="none" />
@@ -137,7 +138,7 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashLane, dashEnd }: 
 const fmtDate = (unix: number) =>
   new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 
-function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashLane, dashEnd }: {
+function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes }: {
   repo: string
   c: Commit
   row: LaneRow
@@ -145,8 +146,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashLane,
   remotes: string[]
   selected: boolean
   onSelect: () => void
-  dashLane: number | null
-  dashEnd: boolean
+  dashes: Dash[]
 }) {
   const isMerge = c.parents.length > 1
   const avatarUrl = useAvatar(repo, isMerge ? null : c.email)
@@ -202,7 +202,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashLane,
         />
       )}
       <span className="graph-col">
-        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} dashLane={dashLane} dashEnd={dashEnd} />
+        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} dashes={dashes} />
       </span>
       <span className="subject" title={c.subject}>{c.subject}</span>
       <span className="author">{c.author}</span>
@@ -212,11 +212,54 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashLane,
   )
 }
 
-function GraphView({ repo, commits, status, remotes, selection, onSelect, onLoadMore, hasMore }: {
+// stash node at its chronological row, drawn on its base commit's lane; lanes crossing
+// the insertion row's top edge (incoming ∪ through) continue solid through this row
+// ponytail: other stashes' dotted spans skip this row — gap only when two stash spans overlap
+function StashRow({ s, lane, passRow, width, wipLane, selected, onSelect }: {
+  s: StashEntry
+  lane: number // base commit's lane (where the square and connector sit)
+  passRow: LaneRow // the commit row this stash was inserted above
+  width: number
+  wipLane: number | null // WIP → HEAD connector crossing this row
+  selected: boolean
+  onSelect: () => void
+}) {
+  const x = (l: number) => l * COL + COL / 2
+  const sx = x(lane)
+  const sc = color(lane)
+  const solids = [...new Set([...passRow.incoming, ...passRow.through])]
+  return (
+    <div className={`row stash${selected ? ' selected' : ''}`} onClick={onSelect}>
+      <span className="refs" />
+      <span className="graph-col">
+        <svg width={width} height={ROW} className="graph-cell">
+          {solids.map(l => (
+            <line key={l} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} strokeWidth="2" />
+          ))}
+          {wipLane != null && !solids.includes(wipLane) && (
+            <line x1={x(wipLane)} y1={0} x2={x(wipLane)} y2={ROW} stroke={color(wipLane)} strokeWidth="2" strokeDasharray="2 3" />
+          )}
+          <line x1={sx} y1={ROW / 2 + AV_R + 1} x2={sx} y2={ROW} stroke={sc} strokeWidth="2" strokeDasharray="2 3" />
+          <rect x={sx - AV_R} y={ROW / 2 - AV_R} width={AV_R * 2} height={AV_R * 2} rx="4" fill="var(--bg-panel)" stroke={sc} strokeWidth="1.5" strokeDasharray="3 3" />
+          {/* inbox-tray glyph */}
+          <g transform={`translate(${sx}, ${ROW / 2})`} stroke={sc} strokeWidth="1.3" fill="none" strokeLinejoin="round" strokeLinecap="round">
+            <path d="M -4.5 0 v 3.5 h 9 v -3.5" />
+            <path d="M -4.5 0 h 2.5 l 1 1.5 h 2 l 1 -1.5 h 2.5" />
+            <path d="M -3 -2 l 3 -2 l 3 2" />
+          </g>
+        </svg>
+      </span>
+      <span className="subject" title={s.subject}>{s.subject}</span>
+    </div>
+  )
+}
+
+function GraphView({ repo, commits, status, remotes, stashes, selection, onSelect, onLoadMore, hasMore }: {
   repo: string
   commits: Commit[]
   status: StatusEntry[]
   remotes: string[]
+  stashes: StashEntry[]
   selection: Selection
   onSelect: (s: Selection) => void
   onLoadMore: () => void
@@ -231,6 +274,29 @@ function GraphView({ repo, commits, status, remotes, selection, onSelect, onLoad
   const hx = headLane * COL + COL / 2
   const hc = color(headLane)
 
+  // stash placement: chronological slot in the (roughly date-descending) topo list,
+  // dotted connector running down its base commit's lane to the base row
+  const placements = useMemo(() => {
+    const byRow = new Map<number, { s: StashEntry; endIdx: number; lane: number }[]>()
+    for (const s of stashes) {
+      const endIdx = commits.findIndex(c => c.hash === s.parent)
+      if (endIdx < 0) continue
+      let insertIdx = commits.findIndex(c => c.date <= s.date)
+      if (insertIdx < 0 || insertIdx > endIdx) insertIdx = endIdx // never below its base
+      const p = { s, endIdx, lane: rows[endIdx].lane }
+      byRow.set(insertIdx, [...(byRow.get(insertIdx) ?? []), p])
+    }
+    return byRow
+  }, [commits, rows, stashes])
+  // dotted overlays crossing commit row i: WIP → HEAD, plus each stash span insertIdx..endIdx
+  const dashesFor = (i: number): Dash[] => {
+    const out: Dash[] = showWip && headIdx >= 0 && i <= headIdx ? [{ lane: headLane, end: i === headIdx }] : []
+    for (const [insertIdx, list] of placements) {
+      for (const p of list) if (insertIdx <= i && i <= p.endIdx) out.push({ lane: p.lane, end: i === p.endIdx })
+    }
+    return out
+  }
+
   return (
     <div className="graphview">
       {showWip && (
@@ -238,6 +304,7 @@ function GraphView({ repo, commits, status, remotes, selection, onSelect, onLoad
           <span className="refs" />
           <span className="graph-col">
             <svg width={width} height={ROW} className="graph-cell">
+              {/* stash connectors don't reach the WIP row — it sits above them */}
               {headIdx >= 0 && <line x1={hx} y1={ROW / 2 + AV_R + 1} x2={hx} y2={ROW} stroke={hc} strokeWidth="2" strokeDasharray="2 3" />}
               <circle cx={hx} cy={ROW / 2} r={AV_R} fill="none" stroke={hc} strokeWidth="1.5" strokeDasharray="3 3" />
             </svg>
@@ -245,20 +312,36 @@ function GraphView({ repo, commits, status, remotes, selection, onSelect, onLoad
           <span className="subject">{status.length} uncommitted change{status.length > 1 ? 's' : ''}</span>
         </div>
       )}
-      {commits.map((c, i) => (
-        <CommitRow
-          key={c.hash}
-          repo={repo}
-          c={c}
-          row={rows[i]}
-          width={width}
-          remotes={remotes}
-          selected={selection?.kind === 'commit' && selection.hash === c.hash}
-          onSelect={() => onSelect({ kind: 'commit', hash: c.hash })}
-          dashLane={showWip && headIdx >= 0 && i <= headIdx ? headLane : null}
-          dashEnd={i === headIdx}
-        />
-      ))}
+      {commits.map((c, i) => {
+        const rowStashes = placements.get(i)
+        const crossWip = showWip && headIdx >= 0 && i <= headIdx
+        return (
+          <Fragment key={c.hash}>
+            {rowStashes?.map(p => (
+              <StashRow
+                key={p.s.hash}
+                s={p.s}
+                lane={p.lane}
+                passRow={rows[i]}
+                width={width}
+                wipLane={crossWip ? headLane : null}
+                selected={selection?.kind === 'commit' && selection.hash === p.s.hash}
+                onSelect={() => onSelect({ kind: 'commit', hash: p.s.hash })}
+              />
+            ))}
+            <CommitRow
+              repo={repo}
+              c={c}
+              row={rows[i]}
+              width={width}
+              remotes={remotes}
+              selected={selection?.kind === 'commit' && selection.hash === c.hash}
+              onSelect={() => onSelect({ kind: 'commit', hash: c.hash })}
+              dashes={dashesFor(i)}
+            />
+          </Fragment>
+        )
+      })}
       {hasMore && <button className="load-more" onClick={onLoadMore}>Load more</button>}
     </div>
   )

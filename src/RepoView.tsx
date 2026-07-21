@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import type { Commit, StatusEntry } from '../server/parse.ts'
+import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api } from './api'
 import GraphView from './GraphView'
 import CommitPanel from './CommitPanel'
@@ -11,14 +11,15 @@ export type Selection = { kind: 'commit'; hash: string } | { kind: 'wip' } | nul
 // Cheap change detection: hashes + ref positions cover every visible graph change
 // (amend/rebase rewrite hashes; branch moves show up in refs). Status compares
 // path+code pairs. Identical fingerprint → skip setState → no 500-row re-render.
-const graphFp = (commits: Commit[], hasMore: boolean) =>
-  commits.map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + (hasMore ? '+' : '')
+const graphFp = (commits: Commit[], hasMore: boolean, stashes: StashEntry[] = []) =>
+  commits.map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + (hasMore ? '+' : '') + stashes.map(s => s.hash).join(',')
 const statusFp = (files: StatusEntry[]) => files.map(f => f.status + f.path).join('\n')
 
 export default function RepoView({ repo, onRemove }: { repo: string; onRemove: () => void }) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [remotes, setRemotes] = useState<string[]>([])
+  const [stashes, setStashes] = useState<StashEntry[]>([])
   const [status, setStatus] = useState<StatusEntry[]>([])
   const [selection, setSelection] = useState<Selection>(null)
   const [file, setFile] = useState<string | null>(null)
@@ -43,18 +44,19 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     const g = ++gen.current
     const limit = Math.max(loaded.current, 500)
     Promise.all([
-      api<{ commits: Commit[]; hasMore: boolean; remotes: string[] }>(`/api/graph?${q}&limit=${limit}`),
+      api<{ commits: Commit[]; hasMore: boolean; remotes: string[]; stashes: StashEntry[] }>(`/api/graph?${q}&limit=${limit}`),
       api<{ files: StatusEntry[] }>(`/api/status?${q}`),
     ]).then(([gRes, s]) => {
       if (g !== gen.current) return // superseded by a newer request — latest wins
       inflight.current = false // spin stops at next iteration boundary, never mid-turn
       setError(null)
-      const gf = graphFp(gRes.commits, gRes.hasMore)
+      const gf = graphFp(gRes.commits, gRes.hasMore, gRes.stashes)
       if (fps.current.graph !== gf) {
         fps.current.graph = gf
         setCommits(gRes.commits)
         setHasMore(gRes.hasMore)
         setRemotes(gRes.remotes)
+        setStashes(gRes.stashes ?? [])
         // commit rewritten away (rebase/amend) → back to initial-load selection
         setSelection(sel =>
           sel?.kind === 'commit' && !gRes.commits.some(c => c.hash === sel.hash) ? null : sel)
@@ -185,7 +187,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
         <div className="graph-pane" style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
-          <GraphView repo={repo} commits={commits} status={status} remotes={remotes} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
+          <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} />
           <div className="col-splitter" style={{ left: refsW + 9 }} onPointerDown={onSplitDown} onPointerMove={onRefsMove} />
           <div className="col-splitter" style={{ left: refsW + graphColW + 17 }} onPointerDown={onSplitDown} onPointerMove={onGraphColMove} />
           {file && selection && (
