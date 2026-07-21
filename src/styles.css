@@ -97,8 +97,13 @@ button:hover { background: var(--border); }
 
 .diffview { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; }
 .diffview.empty { align-items: center; justify-content: center; text-align: center; }
-.diff-toolbar { padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.diff-toolbar { padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; justify-content: center; }
 .diff-toolbar button { padding: 3px 10px; }
+.view-toggle { display: inline-flex; }
+.view-toggle button { border-radius: 0; }
+.view-toggle button:first-child { border-radius: 4px 0 0 4px; }
+.view-toggle button:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+.view-toggle button.active { background: var(--bg-selected); }
 .diff-html { flex: 1; overflow: auto; }
 .diff-plain { padding: 10px; color: var(--fg-dim); }
 .d2h-wrapper { --d2h-bg-color: var(--bg-panel); --d2h-dark-bg-color: #23272e; }

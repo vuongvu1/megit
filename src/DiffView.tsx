@@ -65,7 +65,10 @@ export default function DiffView({ repo, hash, file, wipTick }: { repo: string; 
   return (
     <div className="diffview">
       <div className="diff-toolbar">
-        <button onClick={() => { setSplit(!split); localStorage.setItem('megit-diff-split', split ? '0' : '1') }}>{split ? 'Unified' : 'Side-by-side'}</button>
+        <div className="view-toggle">
+          <button className={split ? '' : 'active'} onClick={() => { setSplit(false); localStorage.setItem('megit-diff-split', '0') }}>Diff View</button>
+          <button className={split ? 'active' : ''} onClick={() => { setSplit(true); localStorage.setItem('megit-diff-split', '1') }}>File View</button>
+        </div>
       </div>
       {plain
         ? <pre className="diff-plain">{resp.diff?.trim() || 'No changes'}</pre>
