@@ -45,3 +45,18 @@ export function layout(commits: { hash: string; parents: string[] }[]): { rows: 
   })
   return { rows, maxLanes }
 }
+
+// First lane a dotted stash connector can run down rows[from..to] without
+// crossing solid graph lines. `to` is the base commit's row: only its top-half
+// traffic (through/incoming) blocks, so a stash directly above a quiet base
+// shares the base's lane. `taken` holds lanes claimed by other dotted spans
+// overlapping this one (other stashes, the WIP connector).
+export function freeLane(rows: LaneRow[], from: number, to: number, taken: number[]): number {
+  const busy = (l: number) =>
+    rows[to].through.includes(l) || rows[to].incoming.includes(l) ||
+    rows.slice(from, to).some(r =>
+      r.lane === l || r.through.includes(l) || r.incoming.includes(l) || r.outgoing.includes(l))
+  let l = 0
+  while (taken.includes(l) || busy(l)) l++
+  return l
+}

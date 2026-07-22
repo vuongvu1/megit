@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { layout } from './lanes.ts'
+import { layout, freeLane } from './lanes.ts'
 
 const c = (hash: string, ...parents: string[]) => ({ hash, parents })
 
@@ -39,5 +39,31 @@ describe('layout', () => {
     // two independent roots: second root reuses lane 0
     const { rows } = layout([c('b'), c('a')])
     expect(rows.map(r => r.lane)).toEqual([0, 0])
+  })
+})
+
+describe('freeLane', () => {
+  it('sidesteps solid traffic crossing the span', () => {
+    // m merges b and c; merge link runs down lane 1 into c — a stash based on c
+    // can't share lane 1 (or lane 0, busy with b's line), so it gets lane 2
+    const { rows } = layout([c('m', 'b', 'c'), c('b', 'a'), c('c', 'a'), c('a')])
+    expect(freeLane(rows, 2, 2, [])).toBe(2)
+  })
+
+  it('shares the base lane when nothing crosses it', () => {
+    // stash directly above the tip commit: base row has no top-half traffic
+    const { rows } = layout([c('b', 'a'), c('a')])
+    expect(freeLane(rows, 0, 0, [])).toBe(0)
+  })
+
+  it('sidesteps when the base has a child link running through', () => {
+    // base 'a' has child 'b' above — solid lane-0 line enters 'a' from the top
+    const { rows } = layout([c('b', 'a'), c('a')])
+    expect(freeLane(rows, 1, 1, [])).toBe(1)
+  })
+
+  it('skips lanes already taken by other dotted spans', () => {
+    const { rows } = layout([c('b', 'a'), c('a')])
+    expect(freeLane(rows, 0, 0, [0])).toBe(1)
   })
 })
