@@ -1,7 +1,7 @@
 import { Fragment, memo, useMemo } from 'react'
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
-import { layout, freeLane, type LaneRow } from './lanes'
+import { layout, stashSlot, activeTrail, type LaneRow, type TrailRow } from './lanes'
 import type { Selection } from './RepoView'
 import { useAvatar, initials } from './avatar'
 
@@ -78,13 +78,19 @@ const CheckIcon = () => (
 
 type Dash = { lane: number; end: boolean } // WIP/stash connector passing through (end: terminates at this row's dot)
 
-function GraphCell({ row, width, avatarUrl, label, clipId, dashes }: {
+// active-branch emphasis: trail segments thicker, everything else translucent;
+// plain stroke when there's no trail (HEAD not in the loaded commits)
+const emph = (mode: boolean, on: boolean) =>
+  mode ? (on ? { strokeWidth: 3 } : { strokeWidth: 2, strokeOpacity: 0.4 }) : { strokeWidth: 2 }
+
+function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail }: {
   row: LaneRow
   width: number
   avatarUrl: string | null
   label: string | null // author initials; null = merge commit → plain dot
   clipId: string
   dashes: Dash[]
+  trail: TrailRow | null
 }) {
   const x = (l: number) => l * COL + COL / 2
   const mid = ROW / 2
@@ -98,12 +104,12 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes }: {
       ) : (
         <line key={`d${i}`} x1={x(d.lane)} y1={0} x2={x(d.lane)} y2={d.end ? mid : ROW} stroke={color(d.lane)} strokeWidth="2" strokeDasharray="2 3" />
       ))}
-      {row.through.map(l => <line key={`t${l}`} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} strokeWidth="2" />)}
+      {row.through.map(l => <line key={`t${l}`} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} {...emph(!!trail, trail?.through === l)} />)}
       {row.incoming.map(l => (
-        <path key={`i${l}`} d={`M ${x(l)} 0 C ${x(l)} ${mid}, ${x(row.lane)} 0, ${x(row.lane)} ${mid}`} stroke={color(l)} strokeWidth="2" fill="none" />
+        <path key={`i${l}`} d={`M ${x(l)} 0 C ${x(l)} ${mid}, ${x(row.lane)} 0, ${x(row.lane)} ${mid}`} stroke={color(l)} {...emph(!!trail, trail?.incoming === l)} fill="none" />
       ))}
       {row.outgoing.map(l => (
-        <path key={`o${l}`} d={`M ${x(row.lane)} ${mid} C ${x(l)} ${ROW}, ${x(l)} ${mid}, ${x(l)} ${ROW}`} stroke={color(l)} strokeWidth="2" fill="none" />
+        <path key={`o${l}`} d={`M ${x(row.lane)} ${mid} C ${x(l)} ${ROW}, ${x(l)} ${mid}, ${x(l)} ${ROW}`} stroke={color(l)} {...emph(!!trail, !!trail?.outgoing && l === row.lane)} fill="none" />
       ))}
       {label === null ? (
         <circle cx={cx} cy={mid} r="4" fill={c} />
@@ -141,7 +147,7 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes }: {
 const fmtDate = (unix: number) =>
   new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 
-function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, onBusy }: {
+function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onBusy }: {
   repo: string
   c: Commit
   row: LaneRow
@@ -150,6 +156,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, o
   selected: boolean
   onSelect: () => void
   dashes: Dash[]
+  trail: TrailRow | null
   onBusy: (p: Promise<unknown>) => void
 }) {
   const isMerge = c.parents.length > 1
@@ -206,7 +213,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, o
         />
       )}
       <span className="graph-col">
-        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} dashes={dashes} />
+        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} dashes={dashes} trail={trail} />
       </span>
       <span className="subject" title={c.subject}>{c.subject}</span>
       <span className="author">{c.author}</span>
@@ -220,12 +227,13 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, o
 // across its whole dotted span (GitKraken-style); lanes crossing the insertion
 // row's top edge (incoming ∪ through) continue solid through this row
 // ponytail: other stashes' dotted spans skip this row — gap only when two stash spans overlap
-function StashRow({ s, lane, passRow, width, wipLane, selected, onSelect }: {
+function StashRow({ s, lane, passRow, width, wipLane, trailLane, selected, onSelect }: {
   s: StashEntry
   lane: number // display lane (where the square and connector sit)
   passRow: LaneRow // the commit row this stash was inserted above
   width: number
   wipLane: number | null // WIP → HEAD connector crossing this row
+  trailLane: number | null // active-branch line crossing this row (null = no trail)
   selected: boolean
   onSelect: () => void
 }) {
@@ -239,7 +247,7 @@ function StashRow({ s, lane, passRow, width, wipLane, selected, onSelect }: {
       <span className="graph-col">
         <svg width={width} height={ROW} className="graph-cell">
           {solids.map(l => (
-            <line key={l} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} strokeWidth="2" />
+            <line key={l} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} {...emph(trailLane !== null, l === trailLane)} />
           ))}
           {wipLane != null && !solids.includes(wipLane) && (
             <line x1={x(wipLane)} y1={0} x2={x(wipLane)} y2={ROW} stroke={color(wipLane)} strokeWidth="2" strokeDasharray="2 3" />
@@ -280,6 +288,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   const nDotted = (showWip ? 1 : 0) + stashes.filter(s => s.parent === headHash).length
   const reserve = headHash && nDotted > 0 ? headHash : undefined
   const { rows, maxLanes } = useMemo(() => layout(commits, reserve, nDotted), [commits, reserve, nDotted])
+  const trail = useMemo(() => activeTrail(commits, rows, headIdx), [commits, rows, headIdx])
   const wipLane = 0 // reserved above
   const hx = COL / 2
   const hc = color(0)
@@ -297,10 +306,10 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
       let insertIdx = commits.findIndex(c => c.date <= s.date)
       if (insertIdx < 0 || insertIdx > endIdx) insertIdx = endIdx // never below its base
       const taken = spans.filter(t => t.from <= endIdx && insertIdx <= t.to).map(t => t.lane)
-      const lane = freeLane(rows, insertIdx, endIdx, taken)
-      spans.push({ lane, from: insertIdx, to: endIdx })
+      const { idx, lane } = stashSlot(rows, insertIdx, endIdx, taken)
+      spans.push({ lane, from: idx, to: endIdx })
       lanes = Math.max(lanes, lane + 1)
-      byRow.set(insertIdx, [...(byRow.get(insertIdx) ?? []), { s, endIdx, lane }])
+      byRow.set(idx, [...(byRow.get(idx) ?? []), { s, endIdx, lane }])
     }
     return { byRow, lanes }
   }, [commits, rows, stashes, maxLanes, showWip, headIdx, wipLane])
@@ -342,6 +351,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
                 passRow={rows[i]}
                 width={width}
                 wipLane={crossWip ? wipLane : null}
+                trailLane={trail ? (trail[i].through >= 0 ? trail[i].through : trail[i].incoming) : null}
                 selected={selection?.kind === 'commit' && selection.hash === p.s.hash}
                 onSelect={() => onSelect({ kind: 'commit', hash: p.s.hash })}
               />
@@ -355,6 +365,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
               selected={selection?.kind === 'commit' && selection.hash === c.hash}
               onSelect={() => onSelect({ kind: 'commit', hash: c.hash })}
               dashes={dashesFor(i)}
+              trail={trail ? trail[i] : null}
               onBusy={onBusy}
             />
           </Fragment>

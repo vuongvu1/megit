@@ -114,7 +114,10 @@ app.get('/api/graph', repoGuard, async (req, res) => {
       // --exclude before --all: stash commits render as dedicated stash rows, not log rows.
       // Stash bases are added as explicit tips — a reset/dropped branch can leave a base
       // reachable only through its stash, and it must still show in the graph.
-      git(repo, ['log', '--exclude=refs/stash', '--all', ...stashes.map(s => s.parent), '--topo-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
+      // --date-order: children still precede parents (lane layout invariant), but
+      // branches interleave by commit date, GitKraken-style — --topo-order would list
+      // HEAD's whole branch chain before any other branch appears.
+      git(repo, ['log', '--exclude=refs/stash', '--all', ...stashes.map(s => s.parent), '--date-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
       git(repo, ['remote']),
     ])
     const commits = parseLog(raw)

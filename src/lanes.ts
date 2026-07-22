@@ -56,6 +56,29 @@ export function layout(commits: { hash: string; parents: string[] }[], reserve?:
   return { rows, maxLanes }
 }
 
+// Active-branch trail: the first-parent chain from HEAD downward. Per row,
+// which lane carries the checked-out branch's line (-1 = none): `through`
+// between trail commits, `incoming` entering a trail commit's dot, `outgoing`
+// leaving one toward its first parent (always the row's own lane). Null when
+// HEAD isn't in the loaded commits.
+export type TrailRow = { through: number; incoming: number; outgoing: boolean }
+export function activeTrail(commits: { hash: string; parents: string[] }[], rows: LaneRow[], headIdx: number): TrailRow[] | null {
+  if (headIdx < 0) return null
+  const idxOf = new Map(commits.map((c, i) => [c.hash, i]))
+  const out: TrailRow[] = rows.map(() => ({ through: -1, incoming: -1, outgoing: false }))
+  let i = headIdx
+  while (commits[i].parents.length) {
+    out[i].outgoing = true
+    const lane = rows[i].lane
+    const j = idxOf.get(commits[i].parents[0])
+    for (let k = i + 1; k < (j ?? rows.length); k++) out[k].through = lane
+    if (j === undefined || j <= i) break // parent unloaded (or bad topo order)
+    out[j].incoming = lane
+    i = j
+  }
+  return out
+}
+
 // First lane a dotted stash connector can run down rows[from..to] without
 // crossing solid graph lines. `to` is the base commit's row: only its top-half
 // traffic (through/incoming) blocks, so a stash directly above a quiet base
@@ -69,4 +92,19 @@ export function freeLane(rows: LaneRow[], from: number, to: number, taken: numbe
   let l = 0
   while (taken.includes(l) || busy(l)) l++
   return l
+}
+
+// Stash slot: chronological row when the clear lane stays adjacent to the
+// insertion row's own traffic (at most one lane beyond it), else snapped to
+// the base commit's row on the base's own lane — busy history can push the
+// clear lane arbitrarily far right, detached from everything and past the
+// visible column. The stash square is opaque, so it covers any solid line
+// sharing the base lane.
+export function stashSlot(rows: LaneRow[], insertIdx: number, endIdx: number, taken: number[]): { idx: number; lane: number } {
+  const lane = freeLane(rows, insertIdx, endIdx, taken)
+  const r = rows[insertIdx]
+  const local = Math.max(-1, r.lane, ...r.through, ...r.incoming, ...r.outgoing, ...taken)
+  if (lane <= local + 1 || insertIdx === endIdx) return { idx: insertIdx, lane }
+  const base = rows[endIdx].lane
+  return { idx: endIdx, lane: taken.includes(base) ? freeLane(rows, endIdx, endIdx, taken) : base }
 }
