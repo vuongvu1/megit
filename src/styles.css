@@ -61,7 +61,9 @@ button:hover { background: var(--border); }
 .dirlist li:hover { background: var(--bg-hover); }
 .dirname { flex: 1; cursor: pointer; }
 
-.repoview { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); }
+.repoview { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); animation: appear 1s ease-out; }
+@keyframes appear { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .repoview { animation: none; } }
 .toolbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .toolbar button { padding: 3px 10px; }
 .refresh-btn { display: inline-flex; align-items: center; padding: 3px 5px; }
