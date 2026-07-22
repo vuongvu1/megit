@@ -8,18 +8,28 @@ export type LaneRow = {
 // Greedy top-down lane assignment over topo-ordered commits.
 // `expect[i]` = the commit hash lane i is waiting to reach (a parent of
 // something above), or null if the lane is free.
-export function layout(commits: { hash: string; parents: string[] }[]): { rows: LaneRow[]; maxLanes: number } {
+// `reserve` (the HEAD commit, when WIP/stash connectors anchor to it) pins the
+// first `nRes` lanes: rows above it can neither claim nor cross them, so each
+// dotted connector gets its own straight run down into the checked-out branch,
+// GitKraken-style (lane 0 = WIP, then one lane per HEAD-based stash).
+// Reservations are not drawn lines — they never appear in through/incoming.
+export function layout(commits: { hash: string; parents: string[] }[], reserve?: string, nRes = 1): { rows: LaneRow[]; maxLanes: number } {
   const expect: (string | null)[] = []
+  let seeded = reserve !== undefined && nRes > 0 && commits.some(c => c.hash === reserve)
+  if (seeded) for (let i = 0; i < nRes; i++) expect[i] = reserve!
   let maxLanes = 0
   const rows = commits.map(c => {
+    const hit = seeded && c.hash === reserve
+    if (hit) seeded = false
     const incoming: number[] = []
-    expect.forEach((h, i) => { if (h === c.hash) incoming.push(i) })
+    expect.forEach((h, i) => { if (h === c.hash && !(hit && i < nRes)) incoming.push(i) })
+    if (hit) for (let i = 0; i < nRes; i++) expect[i] = null
 
-    let lane = incoming.length ? incoming[0] : expect.indexOf(null)
+    let lane = hit ? 0 : incoming.length ? incoming[0] : expect.indexOf(null, seeded ? nRes : 0)
     if (lane === -1) lane = expect.length
 
     const through: number[] = []
-    expect.forEach((h, i) => { if (h !== null && h !== c.hash && i !== lane) through.push(i) })
+    expect.forEach((h, i) => { if (h !== null && h !== c.hash && i !== lane && !(seeded && i < nRes)) through.push(i) })
 
     for (const i of incoming) expect[i] = null
     const outgoing: number[] = []
@@ -27,9 +37,9 @@ export function layout(commits: { hash: string; parents: string[] }[]): { rows: 
       expect[lane] = c.parents[0]
       outgoing.push(lane)
       for (const p of c.parents.slice(1)) {
-        let t = expect.indexOf(p)
+        let t = expect.indexOf(p, seeded ? nRes : 0)
         if (t === -1) {
-          t = expect.indexOf(null)
+          t = expect.indexOf(null, seeded ? nRes : 0)
           if (t === -1) t = expect.length
           expect[t] = p
         }

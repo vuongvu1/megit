@@ -271,15 +271,18 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   hasMore: boolean
   onBusy: (p: Promise<unknown>) => void
 }) {
-  const { rows, maxLanes } = useMemo(() => layout(commits), [commits])
-  // WIP row connects to the commit HEAD points at, down a lane free of solid
-  // traffic (GitKraken-style) — HEAD deep in the graph would otherwise put the
-  // dotted connector on top of merge links crossing its lane
   const headIdx = useMemo(() => commits.findIndex(c => c.refs.some(r => r === 'HEAD' || r.startsWith('HEAD -> '))), [commits])
+  const headHash = headIdx >= 0 ? commits[headIdx].hash : undefined
   const showWip = status.length > 0
-  const wipLane = useMemo(() => (headIdx >= 0 ? freeLane(rows, 0, headIdx, []) : 0), [rows, headIdx])
-  const hx = wipLane * COL + COL / 2
-  const hc = color(wipLane)
+  // pin HEAD's branch to lane 0 and reserve one lane per dotted connector
+  // anchored to it (WIP, then HEAD-based stashes) — each runs straight down
+  // into the checked-out branch, GitKraken-style, instead of routing around
+  const nDotted = (showWip ? 1 : 0) + stashes.filter(s => s.parent === headHash).length
+  const reserve = headHash && nDotted > 0 ? headHash : undefined
+  const { rows, maxLanes } = useMemo(() => layout(commits, reserve, nDotted), [commits, reserve, nDotted])
+  const wipLane = 0 // reserved above
+  const hx = COL / 2
+  const hc = color(0)
 
   // stash placement: chronological slot in the (roughly date-descending) topo list,
   // dotted connector running down a lane free of solid traffic, curving into the base row
