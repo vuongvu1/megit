@@ -27,6 +27,13 @@ export const toggleTheme = () => {
   listeners.forEach(l => l())
 }
 
+window.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o') {
+    e.preventDefault()
+    toggleTheme()
+  }
+})
+
 export const useTheme = () =>
   useSyncExternalStore(cb => {
     listeners.add(cb)

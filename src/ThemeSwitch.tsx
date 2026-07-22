@@ -15,7 +15,7 @@ const Moon = () => (
 
 export default function ThemeSwitch() {
   return (
-    <label className="theme-switch" title="Toggle light/dark theme">
+    <label className="theme-switch" title="Toggle light/dark theme (⌘⇧O)">
       <input type="checkbox" checked={useTheme() === 'light'} onChange={toggleTheme} />
       <Sun />
       <Moon />
