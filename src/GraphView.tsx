@@ -272,20 +272,22 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   onBusy: (p: Promise<unknown>) => void
 }) {
   const { rows, maxLanes } = useMemo(() => layout(commits), [commits])
-  // WIP row connects to the commit HEAD points at, on that commit's lane (GitKraken-style)
+  // WIP row connects to the commit HEAD points at, down a lane free of solid
+  // traffic (GitKraken-style) — HEAD deep in the graph would otherwise put the
+  // dotted connector on top of merge links crossing its lane
   const headIdx = useMemo(() => commits.findIndex(c => c.refs.some(r => r === 'HEAD' || r.startsWith('HEAD -> '))), [commits])
   const showWip = status.length > 0
-  const headLane = headIdx >= 0 ? rows[headIdx].lane : 0
-  const hx = headLane * COL + COL / 2
-  const hc = color(headLane)
+  const wipLane = useMemo(() => (headIdx >= 0 ? freeLane(rows, 0, headIdx, []) : 0), [rows, headIdx])
+  const hx = wipLane * COL + COL / 2
+  const hc = color(wipLane)
 
   // stash placement: chronological slot in the (roughly date-descending) topo list,
   // dotted connector running down a lane free of solid traffic, curving into the base row
   const placements = useMemo(() => {
     const byRow = new Map<number, { s: StashEntry; endIdx: number; lane: number }[]>()
     const spans: { lane: number; from: number; to: number }[] =
-      showWip && headIdx >= 0 ? [{ lane: headLane, from: 0, to: headIdx }] : []
-    let lanes = maxLanes
+      showWip && headIdx >= 0 ? [{ lane: wipLane, from: 0, to: headIdx }] : []
+    let lanes = showWip && headIdx >= 0 ? Math.max(maxLanes, wipLane + 1) : maxLanes
     for (const s of stashes) {
       const endIdx = commits.findIndex(c => c.hash === s.parent)
       if (endIdx < 0) continue
@@ -298,11 +300,11 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
       byRow.set(insertIdx, [...(byRow.get(insertIdx) ?? []), { s, endIdx, lane }])
     }
     return { byRow, lanes }
-  }, [commits, rows, stashes, maxLanes, showWip, headIdx, headLane])
+  }, [commits, rows, stashes, maxLanes, showWip, headIdx, wipLane])
   const width = Math.max(placements.lanes, 1) * COL
   // dotted overlays crossing commit row i: WIP → HEAD, plus each stash span insertIdx..endIdx
   const dashesFor = (i: number): Dash[] => {
-    const out: Dash[] = showWip && headIdx >= 0 && i <= headIdx ? [{ lane: headLane, end: i === headIdx }] : []
+    const out: Dash[] = showWip && headIdx >= 0 && i <= headIdx ? [{ lane: wipLane, end: i === headIdx }] : []
     for (const [insertIdx, list] of placements.byRow) {
       for (const p of list) if (insertIdx <= i && i <= p.endIdx) out.push({ lane: p.lane, end: i === p.endIdx })
     }
@@ -336,7 +338,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
                 lane={p.lane}
                 passRow={rows[i]}
                 width={width}
-                wipLane={crossWip ? headLane : null}
+                wipLane={crossWip ? wipLane : null}
                 selected={selection?.kind === 'commit' && selection.hash === p.s.hash}
                 onSelect={() => onSelect({ kind: 'commit', hash: p.s.hash })}
               />

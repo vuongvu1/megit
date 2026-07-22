@@ -66,4 +66,11 @@ describe('freeLane', () => {
     const { rows } = layout([c('b', 'a'), c('a')])
     expect(freeLane(rows, 0, 0, [0])).toBe(1)
   })
+
+  it('routes a WIP connector past a merge into the checked-out commit', () => {
+    // HEAD on 'c' (row 2, lane 1): its child merge 'm' sends a link down lane 1,
+    // lane 0 is busy with b's line — the top-row-to-HEAD span needs lane 2
+    const { rows } = layout([c('m', 'b', 'c'), c('b', 'a'), c('c', 'a'), c('a')])
+    expect(freeLane(rows, 0, 2, [])).toBe(2)
+  })
 })
