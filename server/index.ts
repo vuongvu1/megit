@@ -105,7 +105,7 @@ app.get('/api/graph', repoGuard, async (req, res) => {
   const skip = Number(req.query.skip) || 0
   const limit = Math.max(1, Number(req.query.limit) || 500)
   try {
-    const stashRaw = await git(repo, ['stash', 'list', '--format=%H%x1f%P%x1f%at%x1f%s']).catch(() => '')
+    const stashRaw = await git(repo, ['stash', 'list', '--format=%H%x1f%P%x1f%ct%x1f%s']).catch(() => '')
     const stashes = stashRaw.split('\n').filter(Boolean).map(l => {
       const [hash, parents, date, subject] = l.split('\x1f')
       return { hash, parent: parents.split(' ')[0], date: Number(date), subject }

@@ -12,7 +12,9 @@ export type StatusEntry = { path: string; status: string }
 export type StashEntry = { hash: string; parent: string; date: number; subject: string }
 
 // \x1f field sep, \x1e record sep — never appear in git metadata
-export const LOG_FORMAT = '%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%D%x1f%s%x1e'
+// %ct (committer date), not %at: --date-order sorts by committer date, and stash
+// placement bisects on commit.date — author dates go non-monotonic after rebase/revert
+export const LOG_FORMAT = '%H%x1f%P%x1f%an%x1f%ae%x1f%ct%x1f%D%x1f%s%x1e'
 
 export function parseLog(raw: string): Commit[] {
   return raw
