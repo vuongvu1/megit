@@ -166,6 +166,12 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     return
   }
   try {
+    // uncommitted changes always go to a stash before any checkout, so no
+    // path can fail on (or silently carry over) a dirty working tree
+    const dirty = (await git(repo, ['status', '--porcelain'])).trim() !== ''
+    const stashIfDirty = async (why: string) => {
+      if (dirty) await git(repo, ['stash', 'push', '-u', '-m', `megit: ${why}`])
+    }
     const remotes = (await git(repo, ['remote'])).split('\n').filter(Boolean)
     let remoteRef: string | null = null
     for (const r of remotes) {
@@ -177,17 +183,19 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     const hasLocal = !!(await revParse(repo, `refs/heads/${branch}`))
     if (!remoteRef || !hasLocal) {
       // plain `checkout <name>` DWIMs a remote-only branch into a local tracking branch
+      await stashIfDirty(`WIP before checkout ${branch}`)
       await git(repo, ['checkout', branch])
-      res.json({ ok: true })
+      res.json({ ok: true, stashed: dirty })
       return
     }
     const localOnly = Number((await git(repo, ['rev-list', '--count', `${remoteRef}..refs/heads/${branch}`])).trim())
     const remoteOnly = Number((await git(repo, ['rev-list', '--count', `refs/heads/${branch}..${remoteRef}`])).trim())
     if (localOnly === 0) {
       // equal or strictly behind: checkout, then fast-forward to the remote
+      await stashIfDirty(`WIP before checkout ${branch}`)
       await git(repo, ['checkout', branch])
       if (remoteOnly > 0) await git(repo, ['merge', '--ff-only', remoteRef])
-      res.json({ ok: true, forwarded: remoteOnly })
+      res.json({ ok: true, forwarded: remoteOnly, stashed: dirty })
       return
     }
     if (!reset) {
@@ -195,8 +203,7 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
       res.json({ diverged: true, remoteRef, ahead: localOnly, behind: remoteOnly })
       return
     }
-    const dirty = (await git(repo, ['status', '--porcelain'])).trim() !== ''
-    if (dirty) await git(repo, ['stash', 'push', '-u', '-m', `megit: ${branch} before reset to ${remoteRef}`])
+    await stashIfDirty(`${branch} before reset to ${remoteRef}`)
     await git(repo, ['checkout', '-B', branch, remoteRef])
     res.json({ ok: true, reset: true, stashed: dirty })
   } catch (e) {
