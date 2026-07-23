@@ -70,6 +70,8 @@ button:hover { background: var(--border); }
 .refresh-btn .spin { animation: spin .5s cubic-bezier(.45, 0, .55, 1) infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .repo-path { min-width: 0; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.github-link { display: inline-flex; align-items: center; color: var(--fg-dim); flex-shrink: 0; }
+.github-link:hover { color: var(--fg); }
 .theme-switch { margin-left: auto; position: relative; display: inline-flex; align-items: center; justify-content: space-between; width: 40px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--bg-hover); border: 1px solid var(--border); color: var(--fg-dim); cursor: pointer; flex-shrink: 0; }
 .theme-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 .theme-switch svg { position: relative; }

@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
-import { resolveAvatar } from './avatars.ts'
+import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { parseLog, parseStatus, LOG_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 
@@ -110,7 +110,7 @@ app.get('/api/graph', repoGuard, async (req, res) => {
       const [hash, parents, date, subject] = l.split('\x1f')
       return { hash, parent: parents.split(' ')[0], date: Number(date), subject }
     })
-    const [raw, remoteRaw] = await Promise.all([
+    const [raw, remoteRaw, originUrl] = await Promise.all([
       // --exclude before --all: stash commits render as dedicated stash rows, not log rows.
       // Stash bases are added as explicit tips — a reset/dropped branch can leave a base
       // reachable only through its stash, and it must still show in the graph.
@@ -119,10 +119,12 @@ app.get('/api/graph', repoGuard, async (req, res) => {
       // HEAD's whole branch chain before any other branch appears.
       git(repo, ['log', '--exclude=refs/stash', '--all', ...stashes.map(s => s.parent), '--date-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
       git(repo, ['remote']),
+      git(repo, ['remote', 'get-url', 'origin']).catch(() => ''),
     ])
     const commits = parseLog(raw)
     const remotes = remoteRaw.split('\n').filter(Boolean)
-    res.json({ commits: commits.slice(0, limit), hasMore: commits.length > limit, remotes, stashes })
+    const gh = parseGithubRemote(originUrl)
+    res.json({ commits: commits.slice(0, limit), hasMore: commits.length > limit, remotes, stashes, githubUrl: gh ? `https://github.com/${gh.owner}/${gh.repo}` : null })
   } catch (e) {
     const msg = (e as Error).message
     if (/does not have any commits yet/.test(msg)) {
