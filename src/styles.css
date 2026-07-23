@@ -86,19 +86,20 @@ button:hover { background: var(--border); }
 .diff-close { border: none; background: none; padding: 0 4px; font-size: 14px; }
 .splitter { width: 5px; flex-shrink: 0; cursor: col-resize; background: var(--border); background-clip: padding-box; border: 2px solid transparent; touch-action: none; }
 .splitter:hover, .splitter:active { background-color: #5a80b0; }
-.row { position: relative; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
-.row:hover { background: var(--bg-hover); }
-.row.selected { background: var(--bg-selected); }
+.row { position: relative; isolation: isolate; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
+/* hover/selection highlight covers graph + messages only — refs column is a separate, inert pane */
+.row::before { content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: calc(8px + var(--refs-w, 120px)); right: 0; }
+.row:hover:not(:has(.refs:hover))::before { background: var(--bg-hover); }
+.row.selected::before { background: var(--bg-selected); }
 .row.wip { position: sticky; top: 0; background: var(--bg-wip); z-index: 1; font-style: italic; }
-.row.wip.selected { background: var(--bg-selected); }
 .graph-cell { flex-shrink: 0; overflow: visible; }
 /* uniform width per row keeps graph lanes vertically aligned; user-resizable via col-splitters */
-.refs { display: flex; gap: 4px; width: var(--refs-w, 120px); flex-shrink: 0; justify-content: flex-start; overflow: hidden; }
+.refs { display: flex; gap: 4px; width: var(--refs-w, 120px); flex-shrink: 0; align-self: stretch; align-items: center; justify-content: flex-start; overflow: hidden; cursor: default; }
 /* 3px pad keeps the lane-0 avatar (overhangs svg left edge by ~2.75px) unclipped; symmetric so centering math is unchanged */
 .graph-col { display: flex; align-items: center; justify-content: safe center; width: var(--graph-col-w, 90px); padding: 0 3px; flex-shrink: 0; overflow: hidden; align-self: stretch; }
 .col-splitter { position: absolute; top: 0; bottom: 0; width: 5px; cursor: col-resize; touch-action: none; z-index: 1; }
 .col-splitter:hover, .col-splitter:active { background: #5a80b0; }
-.ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 12px; color: var(--fg); background: var(--bg-panel); min-width: 0; user-select: none; }
+.ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 12px; color: var(--fg); background: var(--bg-panel); min-width: 0; user-select: none; cursor: pointer; }
 .ref-chip:hover { background: var(--bg-hover); }
 .ref-chip.head { font-weight: 600; background: var(--head-bg); color: var(--head-fg); }
 .ref-chip.head:hover { background: var(--head-bg-hover); }

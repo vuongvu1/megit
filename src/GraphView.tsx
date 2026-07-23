@@ -164,7 +164,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   const chips = useMemo(() => parseRefs(c.refs, remotes), [c.refs, remotes])
   return (
     <div className={`row${selected ? ' selected' : ''}`} onClick={onSelect}>
-      <span className="refs">
+      <span className="refs" onClick={e => e.stopPropagation()}>
         {chips.map(chip => {
           const canCheckout = !chip.head && !chip.tag && (chip.local || chip.remote)
           return (
@@ -243,7 +243,7 @@ function StashRow({ s, lane, passRow, width, wipLane, trailLane, selected, onSel
   const solids = [...new Set([...passRow.incoming, ...passRow.through])]
   return (
     <div className={`row stash${selected ? ' selected' : ''}`} onClick={onSelect}>
-      <span className="refs" />
+      <span className="refs" onClick={e => e.stopPropagation()} />
       <span className="graph-col">
         <svg width={width} height={ROW} className="graph-cell">
           {solids.map(l => (
@@ -327,7 +327,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
     <div className="graphview">
       {showWip && (
         <div className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`} onClick={() => onSelect({ kind: 'wip' })}>
-          <span className="refs" />
+          <span className="refs" onClick={e => e.stopPropagation()} />
           <span className="graph-col">
             <svg width={width} height={ROW} className="graph-cell">
               {/* stash connectors don't reach the WIP row — it sits above them */}
