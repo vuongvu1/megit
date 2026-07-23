@@ -1,6 +1,6 @@
 # <img src="public/logo.svg" width="28"/> megit
 
-Read-only git repository viewer in the browser: commit graph with branch lanes, tabs for multiple repos, and diffs (unified or side-by-side) — including your uncommitted WIP.
+Git repository viewer in the browser: commit graph with branch lanes, stashes, tabs for multiple repos, and diffs (unified or side-by-side) — including your uncommitted WIP. Branch checkout (with auto-stash when the worktree is dirty) is the one write operation.
 
 ## Requirements
 
@@ -11,15 +11,17 @@ Read-only git repository viewer in the browser: commit graph with branch lanes, 
 
 ```bash
 pnpm install
-pnpm dev        # Express API on :3411 + Vite dev server on :5173
+pnpm dev        # Express API on :4500 + Vite dev server on :4000
 ```
 
 Production:
 
 ```bash
 pnpm build      # vite → dist/
-pnpm start      # serves dist/ + API on http://127.0.0.1:3411
+pnpm start      # serves dist/ + API on http://127.0.0.1:4500
 ```
+
+Ports are configurable via `PORT` (API, default 3411) and `UI_PORT` (Vite dev server, default 5173); the dev/start scripts pin 4500/4000.
 
 ## Usage
 
