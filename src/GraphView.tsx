@@ -227,13 +227,12 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
 // stash node at its chronological row, drawn on a lane free of solid traffic
 // across its whole dotted span (GitKraken-style); lanes crossing the insertion
 // row's top edge (incoming ∪ through) continue solid through this row
-// ponytail: other stashes' dotted spans skip this row — gap only when two stash spans overlap
-function StashRow({ s, lane, passRow, width, wipLane, trailLane, selected, onSelect }: {
+function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSelect }: {
   s: StashEntry
   lane: number // display lane (where the square and connector sit)
   passRow: LaneRow // the commit row this stash was inserted above
   width: number
-  wipLane: number | null // WIP → HEAD connector crossing this row
+  dashes: Dash[] // WIP/other-stash connectors passing through this row
   trailLane: number | null // active-branch line crossing this row (null = no trail)
   selected: boolean
   onSelect: () => void
@@ -250,9 +249,9 @@ function StashRow({ s, lane, passRow, width, wipLane, trailLane, selected, onSel
           {solids.map(l => (
             <line key={l} x1={x(l)} y1={0} x2={x(l)} y2={ROW} stroke={color(l)} {...emph(trailLane !== null, l === trailLane)} />
           ))}
-          {wipLane != null && !solids.includes(wipLane) && (
-            <line x1={x(wipLane)} y1={0} x2={x(wipLane)} y2={ROW} stroke={color(wipLane)} strokeWidth="2" strokeDasharray="2 3" />
-          )}
+          {dashes.map((d, i) => !solids.includes(d.lane) && (
+            <line key={`d${i}`} x1={x(d.lane)} y1={0} x2={x(d.lane)} y2={ROW} stroke={color(d.lane)} strokeWidth="2" strokeDasharray="2 3" />
+          ))}
           <line x1={sx} y1={ROW / 2 + AV_R + 1} x2={sx} y2={ROW} stroke={sc} strokeWidth="2" strokeDasharray="2 3" />
           <rect x={sx - AV_R} y={ROW / 2 - AV_R} width={AV_R * 2} height={AV_R * 2} rx="4" fill="var(--bg-panel)" stroke={sc} strokeWidth="1.5" strokeDasharray="3 3" />
           {/* inbox-tray glyph */}
@@ -323,6 +322,17 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
     }
     return out
   }
+  // dotted overlays crossing the stash row at list position k above commit row i:
+  // WIP → HEAD, plus stash spans whose row sits higher and whose base lies at/below i
+  const stashDashesFor = (i: number, k: number): Dash[] => {
+    const out: Dash[] = showWip && headIdx >= 0 && i <= headIdx ? [{ lane: wipLane, end: false }] : []
+    for (const [insertIdx, list] of placements.byRow) {
+      list.forEach((p, j) => {
+        if (p.endIdx >= i && (insertIdx < i || (insertIdx === i && j < k))) out.push({ lane: p.lane, end: false })
+      })
+    }
+    return out
+  }
 
   return (
     <div className="graphview">
@@ -341,17 +351,16 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
       )}
       {commits.map((c, i) => {
         const rowStashes = placements.byRow.get(i)
-        const crossWip = showWip && headIdx >= 0 && i <= headIdx
         return (
           <Fragment key={c.hash}>
-            {rowStashes?.map(p => (
+            {rowStashes?.map((p, k) => (
               <StashRow
                 key={p.s.hash}
                 s={p.s}
                 lane={p.lane}
                 passRow={rows[i]}
                 width={width}
-                wipLane={crossWip ? wipLane : null}
+                dashes={stashDashesFor(i, k)}
                 trailLane={trail ? (trail[i].through >= 0 ? trail[i].through : trail[i].incoming) : null}
                 selected={selection?.kind === 'commit' && selection.hash === p.s.hash}
                 onSelect={() => onSelect({ kind: 'commit', hash: p.s.hash })}
