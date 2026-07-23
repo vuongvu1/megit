@@ -87,10 +87,11 @@ button:hover { background: var(--border); }
 .splitter { width: 5px; flex-shrink: 0; cursor: col-resize; background: var(--border); background-clip: padding-box; border: 2px solid transparent; touch-action: none; }
 .splitter:hover, .splitter:active { background-color: #5a80b0; }
 .row { position: relative; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
-/* highlight skips the refs column (hard-stop gradient after 8px padding + refs width); background-image so it layers over .row.wip's background-color */
+/* wip tint skips the refs column like hover/selected below; opaque panel background-color keeps the sticky row from showing rows scrolling beneath */
+.row.wip { position: sticky; top: 0; background-color: var(--bg-panel); background-image: linear-gradient(to right, transparent calc(8px + var(--refs-w, 120px)), var(--bg-wip) 0); z-index: 1; font-style: italic; }
+/* highlight skips the refs column (hard-stop gradient after 8px padding + refs width); declared after .row.wip so hover/selected gradients win on wip rows too */
 .row:hover:not(:has(.refs:hover)):not(.selected) { background-image: linear-gradient(to right, transparent calc(8px + var(--refs-w, 120px)), var(--bg-hover) 0); }
 .row.selected { background-image: linear-gradient(to right, transparent calc(8px + var(--refs-w, 120px)), var(--bg-selected) 0); }
-.row.wip { position: sticky; top: 0; background-color: var(--bg-wip); z-index: 1; font-style: italic; }
 .graph-cell { flex-shrink: 0; overflow: visible; }
 /* uniform width per row keeps graph lanes vertically aligned; user-resizable via col-splitters */
 .refs { display: flex; gap: 4px; width: var(--refs-w, 120px); flex-shrink: 0; align-self: stretch; align-items: center; justify-content: flex-start; overflow: hidden; cursor: default; }
