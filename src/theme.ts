@@ -28,7 +28,7 @@ export const toggleTheme = () => {
 }
 
 window.addEventListener('keydown', e => {
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o') {
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'Digit0') {
     e.preventDefault()
     toggleTheme()
   }
