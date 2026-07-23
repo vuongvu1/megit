@@ -96,15 +96,17 @@ export function freeLane(rows: LaneRow[], from: number, to: number, taken: numbe
 
 // Stash slot: chronological row when the clear lane stays adjacent to the
 // insertion row's own traffic (at most one lane beyond it), else snapped to
-// the base commit's row on the base's own lane — busy history can push the
-// clear lane arbitrarily far right, detached from everything and past the
-// visible column. The stash square is opaque, so it covers any solid line
-// sharing the base lane.
+// the base commit's row — busy history can push the clear lane arbitrarily
+// far right, detached from everything and past the visible column. Snapped
+// stashes reuse the base's own lane only when nothing solid crosses it there
+// (a child branch entering the base's dot from above would run straight
+// through the square); otherwise they take the first free lane at that row.
 export function stashSlot(rows: LaneRow[], insertIdx: number, endIdx: number, taken: number[]): { idx: number; lane: number } {
   const lane = freeLane(rows, insertIdx, endIdx, taken)
   const r = rows[insertIdx]
   const local = Math.max(-1, r.lane, ...r.through, ...r.incoming, ...r.outgoing, ...taken)
   if (lane <= local + 1 || insertIdx === endIdx) return { idx: insertIdx, lane }
   const base = rows[endIdx].lane
-  return { idx: endIdx, lane: taken.includes(base) ? freeLane(rows, endIdx, endIdx, taken) : base }
+  const clear = !taken.includes(base) && !rows[endIdx].through.includes(base) && !rows[endIdx].incoming.includes(base)
+  return { idx: endIdx, lane: clear ? base : freeLane(rows, endIdx, endIdx, taken) }
 }

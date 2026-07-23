@@ -100,7 +100,17 @@ describe('stashSlot', () => {
     const commits = [c('t', 'm'), c('m', 'a', 'b', 'x', 'y'), c('a'), c('b'), c('x'), c('y')]
     const { rows } = layout(commits)
     expect(freeLane(rows, 0, 5, [])).toBe(4)
-    expect(stashSlot(rows, 0, 5, [])).toEqual({ idx: 5, lane: rows[5].lane }) // parent's own lane
+    // y's own lane (3) carries the merge line into its dot — first free lane instead
+    expect(stashSlot(rows, 0, 5, [])).toEqual({ idx: 5, lane: 0 })
+  })
+
+  it('snaps to a free lane when solid lines enter the base on its own lane', () => {
+    // two branches off m: both enter m's dot from above (incoming [0,1]), so
+    // the base's own lane carries a solid line — stash must not sit on it
+    const commits = [c('t1b', 't1a'), c('t1a', 'm'), c('t2b', 't2a'), c('t2a', 'm'), c('m', 'a'), c('a')]
+    const { rows } = layout(commits)
+    expect(rows[4].incoming).toEqual([0, 1])
+    expect(stashSlot(rows, 0, 4, [])).toEqual({ idx: 4, lane: 2 })
   })
 
   it('never snaps a stash already at its base', () => {
