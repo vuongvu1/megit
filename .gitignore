@@ -2,5 +2,6 @@ node_modules
 dist
 .e2e-probe
 .playwright-mcp
+test-repo
 .superpowers
 wip-check.yml

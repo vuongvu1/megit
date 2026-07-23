@@ -2,6 +2,8 @@
 
 Git repository viewer in the browser: commit graph with branch lanes, stashes, tabs for multiple repos, and diffs (unified or side-by-side) — including your uncommitted WIP. Branch checkout (with auto-stash when the worktree is dirty) is the one write operation.
 
+![megit — commit graph with branch lanes, stash and WIP rows](docs/screenshot.png)
+
 ## Requirements
 
 - Node ≥ 24 (runs TypeScript directly via native type-stripping)
