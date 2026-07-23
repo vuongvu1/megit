@@ -202,13 +202,13 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
         {chips.length > 0 && <span className="ref-line" style={{ background: color(row.lane) }} />}
       </span>
       {chips.length > 0 && (
-        // bridge: refs edge → commit dot; svg centering offset re-derived from the same CSS vars
+        // bridge: refs edge → commit dot; svg is left-aligned at the 3px column padding
         <span
           className="ref-bridge"
           style={{
             background: color(row.lane),
             left: 'calc(8px + var(--refs-w, 120px))',
-            width: `min(calc(8px + max(3px, (var(--graph-col-w, 90px) - ${width}px) / 2) + ${row.lane * COL + COL / 2 - (isMerge ? 4 : AV_R)}px), calc(8px + var(--graph-col-w, 90px)))`,
+            width: `min(calc(8px + 3px + ${row.lane * COL + COL / 2 - (isMerge ? 4 : AV_R)}px), calc(8px + var(--graph-col-w, 90px)))`,
           }}
         />
       )}

@@ -95,8 +95,8 @@ button:hover { background: var(--border); }
 .graph-cell { flex-shrink: 0; overflow: visible; }
 /* uniform width per row keeps graph lanes vertically aligned; user-resizable via col-splitters */
 .refs { display: flex; gap: 4px; width: var(--refs-w, 120px); flex-shrink: 0; align-self: stretch; align-items: center; justify-content: flex-start; overflow: hidden; cursor: default; }
-/* 3px pad keeps the lane-0 avatar (overhangs svg left edge by ~2.75px) unclipped; symmetric so centering math is unchanged */
-.graph-col { display: flex; align-items: center; justify-content: safe center; width: var(--graph-col-w, 90px); padding: 0 3px; flex-shrink: 0; overflow: hidden; align-self: stretch; }
+/* 3px pad keeps the lane-0 avatar (overhangs svg left edge by ~2.75px) unclipped */
+.graph-col { display: flex; align-items: center; justify-content: flex-start; width: var(--graph-col-w, 90px); padding: 0 3px; flex-shrink: 0; overflow: hidden; align-self: stretch; }
 .col-splitter { position: absolute; top: 0; bottom: 0; width: 5px; cursor: col-resize; touch-action: none; z-index: 1; }
 .col-splitter:hover, .col-splitter:active { background: #5a80b0; }
 .ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 12px; color: var(--fg); background: var(--bg-panel); min-width: 0; user-select: none; cursor: pointer; }
