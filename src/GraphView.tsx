@@ -162,6 +162,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   const isMerge = c.parents.length > 1
   const avatarUrl = useAvatar(repo, isMerge ? null : c.email)
   const chips = useMemo(() => parseRefs(c.refs, remotes), [c.refs, remotes])
+  const isHead = chips.some(ch => ch.head)
   return (
     <div className={`row${selected ? ' selected' : ''}`} onClick={onSelect}>
       <span className="refs" onClick={e => e.stopPropagation()}>
@@ -199,12 +200,12 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
           </span>
           )
         })}
-        {chips.length > 0 && <span className="ref-line" style={{ background: color(row.lane) }} />}
+        {chips.length > 0 && <span className={`ref-line${isHead ? ' head' : ''}`} style={{ background: color(row.lane) }} />}
       </span>
       {chips.length > 0 && (
         // bridge: refs edge → commit dot; svg is left-aligned at the 3px column padding
         <span
-          className="ref-bridge"
+          className={`ref-bridge${isHead ? ' head' : ''}`}
           style={{
             background: color(row.lane),
             left: 'calc(8px + var(--refs-w, 120px))',

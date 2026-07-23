@@ -107,6 +107,9 @@ button:hover { background: var(--border); }
 /* connector: .ref-line fills refs column after last chip; .ref-bridge continues across the gap to the commit dot */
 .ref-line { flex: 1; height: 1px; min-width: 6px; align-self: center; opacity: .5; }
 .ref-bridge { position: absolute; top: calc(50% - 0.5px); height: 1px; opacity: .5; pointer-events: none; }
+/* active branch (HEAD row): connector matches the graph's emphasized trail */
+.ref-line.head, .ref-bridge.head { height: 2px; opacity: 1; }
+.ref-bridge.head { top: calc(50% - 1px); }
 .ref-icon { flex-shrink: 0; opacity: 0.8; }
 .subject { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .author, .date { color: var(--fg-dim); font-size: 12px; }
