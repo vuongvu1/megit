@@ -301,4 +301,5 @@ if (existsSync(dist)) {
   app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(dist, 'index.html')))
 }
 
-app.listen(3411, '127.0.0.1', () => console.log('megit API on http://127.0.0.1:3411'))
+const port = Number(process.env.PORT) || 3411
+app.listen(port, '127.0.0.1', () => console.log(`megit API on http://127.0.0.1:${port}`))
