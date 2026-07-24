@@ -6,7 +6,7 @@ import type { Selection } from './RepoView'
 import { useAvatar, initials } from './avatar'
 
 const ROW = 28
-const COL = 14
+const COL = 18
 const AV_R = 10
 const COLORS = ['#61afef', '#98c379', '#e06c75', '#c678dd', '#e5c07b', '#56b6c2', '#d19a66', '#f47067']
 const color = (l: number) => COLORS[l % COLORS.length]
