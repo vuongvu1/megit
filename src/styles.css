@@ -147,6 +147,11 @@ button:hover { background: var(--border); }
 .view-toggle button:last-child { border-radius: 0 4px 4px 0; border-left: none; }
 .view-toggle button.active { background: var(--bg-selected); }
 .diff-html { flex: 1; overflow: auto; }
+/* d2h line numbers are position:absolute and assume page-level scrolling; anchor
+   them inside our scroller so they scroll vertically with the diff, and scroll
+   long lines horizontally under them via .d2h-file-diff */
+.diff-html .d2h-file-wrapper { position: relative; }
+.diff-html .d2h-file-diff { overflow-x: auto; }
 .diff-html .d2h-diff-table { font-family: 'Ubuntu Mono', ui-monospace, monospace; }
 .diff-plain { padding: 10px; color: var(--fg-dim); }
 /* GitHub (Primer) diff palette */
