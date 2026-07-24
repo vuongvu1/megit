@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api } from './api'
 import GraphView from './GraphView'
@@ -6,11 +6,17 @@ import CommitPanel from './CommitPanel'
 import DiffView from './DiffView'
 import ThemeSwitch from './ThemeSwitch'
 
+// xterm.js + panel stay out of the main bundle until the terminal is first opened
+const TerminalPanel = lazy(() => import('./TerminalPanel'))
+
 export type Selection = { kind: 'commit'; hash: string } | { kind: 'wip' } | null
+
+// survives RepoView remounts so the terminal stays open across tab switches
+const termOpenByRepo = new Map<string, boolean>()
 
 // Cheap change detection: hashes + ref positions cover every visible graph change
 // (amend/rebase rewrite hashes; branch moves show up in refs). Status compares
-// path+code pairs. Identical fingerprint → skip setState → no 500-row re-render.
+// path+code pairs. Identical fingerprint → skip setState → no full-list re-render.
 const graphFp = (commits: Commit[], hasMore: boolean, stashes: StashEntry[] = []) =>
   commits.map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + (hasMore ? '+' : '') + stashes.map(s => s.hash).join(',')
 const statusFp = (files: StatusEntry[]) => files.map(f => f.status + f.path).join('\n')
@@ -28,6 +34,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [wipTick, setWipTick] = useState(0)
   const [spinning, setSpinning] = useState(false)
   const inflight = useRef(false)
+  const [termOpen, setTermOpen] = useState(() => termOpenByRepo.get(repo) ?? false)
   const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
   const [refsW, setRefsW] = useState(() => Number(localStorage.getItem('megit-refs-w')) || 120)
   const [graphColW, setGraphColW] = useState(() => Number(localStorage.getItem('megit-graph-col')) || 90)
@@ -43,7 +50,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     // spin only on manual refresh — silent SSE refetches must not re-render RepoView
     if (!silent) { setError(null); inflight.current = true; setSpinning(true) }
     const g = ++gen.current
-    const limit = Math.max(loaded.current, 500)
+    const limit = Math.max(loaded.current, 100)
     Promise.all([
       api<{ commits: Commit[]; hasMore: boolean; remotes: string[]; stashes: StashEntry[]; githubUrl: string | null }>(`/api/graph?${q}&limit=${limit}`),
       api<{ files: StatusEntry[] }>(`/api/status?${q}`),
@@ -121,10 +128,14 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && (e.target as HTMLElement).tagName !== 'INPUT') refresh()
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyJ') {
+        e.preventDefault() // keep Chrome's downloads panel closed
+        setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o })
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [refresh])
+  }, [refresh, repo])
 
   // pointer capture keeps drag events on the splitter — no window listeners to clean up
   const onSplitDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -199,6 +210,17 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
             <path d="M8 16H3v5" />
           </svg>
         </button>
+        <button
+          className={`term-btn${termOpen ? ' active' : ''}`}
+          onClick={() => setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o })}
+          title="Toggle terminal (⌘J)"
+          aria-label="Toggle terminal"
+        >
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 17l6-5-6-5" />
+            <path d="M12 19h8" />
+          </svg>
+        </button>
         <ThemeSwitch />
       </div>
       <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
@@ -219,6 +241,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         <div className="splitter" onPointerDown={onSplitDown} onPointerMove={onSplitMove} />
         <CommitPanel selection={selection} status={status} repo={repo} file={file} onFileSelect={setFile} />
       </div>
+      {termOpen && <Suspense fallback={<div className="term-panel" />}><TerminalPanel repo={repo} /></Suspense>}
     </div>
   )
 }

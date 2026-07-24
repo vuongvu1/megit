@@ -8,6 +8,7 @@ import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { parseLog, parseStatus, LOG_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
+import { wireTerminal } from './term.ts'
 
 const app = express()
 app.use(express.json())
@@ -103,7 +104,7 @@ app.get('/api/fs', (req, res) => {
 app.get('/api/graph', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const skip = Number(req.query.skip) || 0
-  const limit = Math.max(1, Number(req.query.limit) || 500)
+  const limit = Math.max(1, Number(req.query.limit) || 100)
   try {
     const stashRaw = await git(repo, ['stash', 'list', '--format=%H%x1f%P%x1f%ct%x1f%s']).catch(() => '')
     const stashes = stashRaw.split('\n').filter(Boolean).map(l => {
@@ -304,4 +305,4 @@ if (existsSync(dist)) {
 }
 
 const port = Number(process.env.PORT) || 3411
-app.listen(port, '127.0.0.1', () => console.log(`megit API on http://127.0.0.1:${port}`))
+wireTerminal(app.listen(port, '127.0.0.1', () => console.log(`megit API on http://127.0.0.1:${port}`)))
