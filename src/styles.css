@@ -76,7 +76,11 @@ button:hover { background: var(--border); }
 .term-btn:hover { color: var(--fg); }
 .term-btn.active { color: var(--fg); background: var(--bg-selected); }
 /* .term-panel, not .terminal — xterm puts class "terminal" on its own root element */
-.term-panel { height: 220px; flex-shrink: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--bg); }
+.term-panel { position: relative; height: 220px; flex-shrink: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--bg); }
+.term-resizer { position: absolute; top: -3px; left: 0; right: 0; height: 6px; cursor: ns-resize; touch-action: none; z-index: 3; }
+.term-resizer:hover, .term-resizer:active { background: #5a80b0; }
+.term-close { position: absolute; top: 3px; right: 6px; z-index: 3; border: none; background: none; padding: 0 4px; font-size: 13px; color: var(--fg-dim); }
+.term-close:hover { color: var(--fg); background: none; }
 .term-host { flex: 1; min-height: 0; padding: 4px 0 0 8px; }
 .term-host .xterm { height: 100%; }
 .theme-switch { position: relative; display: inline-flex; align-items: center; justify-content: space-between; width: 40px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--bg-hover); border: 1px solid var(--border); color: var(--fg-dim); cursor: pointer; flex-shrink: 0; }

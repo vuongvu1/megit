@@ -28,7 +28,11 @@ of the theme switch) or `Cmd/Ctrl+J`.
   written straight to the terminal.
 - xterm theme derives from the CSS variables at mount and re-derives on
   megit theme toggle (`useTheme`).
-- Toolbar `>_` button + `Cmd/Ctrl+J` toggle (unchanged from v1).
+- Toolbar `>_` button + `Cmd/Ctrl+J` toggle (unchanged from v1); `✕` close
+  button top-right of the panel.
+- Panel height is drag-resizable via a grab strip on its top edge (pointer
+  capture, clamped 120 px – 80 % of the viewport, persisted in
+  `localStorage["megit-term-h"]`); the fit addon reflows the PTY on resize.
 
 ## Server
 
@@ -51,7 +55,6 @@ of the theme switch) or `Cmd/Ctrl+J`.
 
 ## Skipped (upgrade paths)
 
-- Resizable panel height — splitter pattern exists in RepoView if wanted.
 - Idle reaping of detached PTYs — sessions are per registered repo on a
   personal tool; kill-on-shell-exit is enough. Add a TTL if shells pile up.
 - Multiple terminals per repo.

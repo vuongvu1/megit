@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -15,10 +15,24 @@ const xtermTheme = () => ({
   selectionBackground: cssVar('--bg-selected'),
 })
 
-export default function TerminalPanel({ repo }: { repo: string }) {
+export default function TerminalPanel({ repo, onClose }: { repo: string; onClose: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const theme = useTheme()
+  const [height, setHeight] = useState(() => Number(localStorage.getItem('megit-term-h')) || 220)
+
+  // same pointer-capture drag as RepoView's splitters; panel is bottom-anchored,
+  // so height = viewport bottom minus pointer, clamped to 120px…80% of the window
+  const onResizeDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onResizeMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const h = Math.min(Math.round(window.innerHeight * 0.8), Math.max(120, window.innerHeight - e.clientY))
+    setHeight(h)
+    localStorage.setItem('megit-term-h', String(h))
+  }
 
   useEffect(() => {
     const term = new Terminal({
@@ -77,7 +91,9 @@ export default function TerminalPanel({ repo }: { repo: string }) {
   }, [theme])
 
   return (
-    <div className="term-panel">
+    <div className="term-panel" style={{ height }}>
+      <div className="term-resizer" onPointerDown={onResizeDown} onPointerMove={onResizeMove} />
+      <button className="term-close" onClick={onClose} title="Close terminal (⌘J)" aria-label="Close terminal">✕</button>
       <div className="term-host" ref={hostRef} />
     </div>
   )

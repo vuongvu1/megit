@@ -35,6 +35,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [spinning, setSpinning] = useState(false)
   const inflight = useRef(false)
   const [termOpen, setTermOpen] = useState(() => termOpenByRepo.get(repo) ?? false)
+  const toggleTerm = useCallback(() => setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o }), [repo])
   const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
   const [refsW, setRefsW] = useState(() => Number(localStorage.getItem('megit-refs-w')) || 120)
   const [graphColW, setGraphColW] = useState(() => Number(localStorage.getItem('megit-graph-col')) || 90)
@@ -130,12 +131,12 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       if (e.key === 'r' && !e.metaKey && !e.ctrlKey && (e.target as HTMLElement).tagName !== 'INPUT') refresh()
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyJ') {
         e.preventDefault() // keep Chrome's downloads panel closed
-        setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o })
+        toggleTerm()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [refresh, repo])
+  }, [refresh, toggleTerm])
 
   // pointer capture keeps drag events on the splitter — no window listeners to clean up
   const onSplitDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -212,7 +213,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         </button>
         <button
           className={`term-btn${termOpen ? ' active' : ''}`}
-          onClick={() => setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o })}
+          onClick={toggleTerm}
           title="Toggle terminal (⌘J)"
           aria-label="Toggle terminal"
         >
@@ -241,7 +242,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         <div className="splitter" onPointerDown={onSplitDown} onPointerMove={onSplitMove} />
         <CommitPanel selection={selection} status={status} repo={repo} file={file} onFileSelect={setFile} />
       </div>
-      {termOpen && <Suspense fallback={<div className="term-panel" />}><TerminalPanel repo={repo} /></Suspense>}
+      {termOpen && <Suspense fallback={<div className="term-panel" />}><TerminalPanel repo={repo} onClose={toggleTerm} /></Suspense>}
     </div>
   )
 }
