@@ -7,7 +7,7 @@ import { useAvatar, initials } from './avatar'
 
 const ROW = 28
 const COL = 14
-const AV_R = 9
+const AV_R = 10
 const COLORS = ['#61afef', '#98c379', '#e06c75', '#c678dd', '#e5c07b', '#56b6c2', '#d19a66', '#f47067']
 const color = (l: number) => COLORS[l % COLORS.length]
 
@@ -132,7 +132,7 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail }: {
           ) : (
             <>
               <circle cx={cx} cy={mid} r={AV_R} fill={c} />
-              <text x={cx} y={mid} textAnchor="middle" dominantBaseline="central" fontSize="8" fontWeight="700" fill="#fff">
+              <text x={cx} y={mid} textAnchor="middle" dominantBaseline="central" fontSize="9" fontWeight="700" fill="#fff">
                 {label}
               </text>
             </>

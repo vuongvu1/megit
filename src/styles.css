@@ -34,7 +34,7 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body {
-  font: 15px/1.4 'Ubuntu Mono', ui-monospace, monospace;
+  font: 16px/1.4 'Ubuntu Mono', ui-monospace, monospace;
   background: var(--bg); color: var(--fg);
 }
 button { background: var(--bg-hover); color: inherit; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
@@ -108,11 +108,11 @@ button:hover { background: var(--border); }
 .graph-cell { flex-shrink: 0; overflow: visible; }
 /* uniform width per row keeps graph lanes vertically aligned; user-resizable via col-splitters */
 .refs { display: flex; gap: 4px; width: var(--refs-w, 120px); flex-shrink: 0; align-self: stretch; align-items: center; justify-content: flex-start; overflow: hidden; cursor: default; }
-/* 3px pad keeps the lane-0 avatar (overhangs svg left edge by ~2.75px) unclipped */
-.graph-col { display: flex; align-items: center; justify-content: flex-start; width: var(--graph-col-w, 90px); padding: 0 3px; flex-shrink: 0; overflow: hidden; align-self: stretch; }
+/* 4px pad keeps the lane-0 avatar (overhangs svg left edge by ~3.75px) unclipped */
+.graph-col { display: flex; align-items: center; justify-content: flex-start; width: var(--graph-col-w, 90px); padding: 0 4px; flex-shrink: 0; overflow: hidden; align-self: stretch; }
 .col-splitter { position: absolute; top: 0; bottom: 0; width: 5px; cursor: col-resize; touch-action: none; z-index: 1; }
 .col-splitter:hover, .col-splitter:active { background: #5a80b0; }
-.ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 12px; color: var(--fg); background: var(--bg-panel); min-width: 0; user-select: none; cursor: pointer; }
+.ref-chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid; border-radius: 8px; padding: 1px 6px; font-size: 14px; color: var(--fg); background: var(--bg-panel); min-width: 0; user-select: none; cursor: pointer; }
 .ref-chip:hover { background: var(--bg-hover); }
 .ref-chip.head { font-weight: 600; background: var(--head-bg); color: var(--head-fg); }
 .ref-chip.head:hover { background: var(--head-bg-hover); }
