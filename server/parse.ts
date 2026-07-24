@@ -11,6 +11,34 @@ export type Commit = {
 export type StatusEntry = { path: string; status: string }
 export type StashEntry = { hash: string; parent: string; date: number; subject: string }
 
+export type CommitMeta = {
+  author: string
+  authorEmail: string
+  authorDate: number
+  committer: string
+  committerEmail: string
+  commitDate: number
+  parents: string[]
+  message: string
+}
+
+// %B (full message) contains arbitrary newlines, so it must be the last field
+export const META_FORMAT = '%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%ct%x1f%P%x1f%B'
+
+export function parseMeta(raw: string): CommitMeta {
+  const [author, authorEmail, authorDate, committer, committerEmail, commitDate, parents, ...rest] = raw.split('\x1f')
+  return {
+    author,
+    authorEmail,
+    authorDate: Number(authorDate),
+    committer,
+    committerEmail,
+    commitDate: Number(commitDate),
+    parents: parents ? parents.split(' ') : [],
+    message: rest.join('\x1f').replace(/\n+$/, ''),
+  }
+}
+
 // \x1f field sep, \x1e record sep — never appear in git metadata
 // %ct (committer date), not %at: --date-order sorts by committer date, and stash
 // placement bisects on commit.date — author dates go non-monotonic after rebase/revert

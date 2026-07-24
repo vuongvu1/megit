@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseLog, parseStatus } from './parse.ts'
+import { parseLog, parseMeta, parseStatus } from './parse.ts'
 
 const F = '\x1f'
 const R = '\x1e'
@@ -17,6 +17,27 @@ describe('parseLog', () => {
 
   it('handles empty input', () => {
     expect(parseLog('')).toEqual([])
+  })
+})
+
+describe('parseMeta', () => {
+  it('parses author, committer, parents and multi-line message', () => {
+    const raw = `Vu${F}vu@example.com${F}1750000000${F}GitHub${F}noreply@github.com${F}1750000100${F}aaa bbb${F}feat: subject\n\nbody line 1\nbody line 2\n`
+    expect(parseMeta(raw)).toEqual({
+      author: 'Vu',
+      authorEmail: 'vu@example.com',
+      authorDate: 1750000000,
+      committer: 'GitHub',
+      committerEmail: 'noreply@github.com',
+      commitDate: 1750000100,
+      parents: ['aaa', 'bbb'],
+      message: 'feat: subject\n\nbody line 1\nbody line 2',
+    })
+  })
+
+  it('handles root commit (no parents)', () => {
+    const raw = `Vu${F}vu@example.com${F}1${F}Vu${F}vu@example.com${F}1${F}${F}initial\n`
+    expect(parseMeta(raw).parents).toEqual([])
   })
 })
 

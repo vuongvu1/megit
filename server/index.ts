@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
-import { parseLog, parseStatus, LOG_FORMAT } from './parse.ts'
+import { parseLog, parseMeta, parseStatus, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal } from './term.ts'
 
@@ -256,7 +256,9 @@ app.get('/api/commit', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const hash = String(req.query.hash ?? '')
   try {
-    const parent = await firstParent(repo, hash)
+    // one show call yields message/author/committer AND the parent list for the diff
+    const meta = parseMeta(await git(repo, ['show', '-s', `--format=${META_FORMAT}`, hash]))
+    const parent = meta.parents[0] ?? null
     const raw = parent
       ? await git(repo, ['diff', '--name-status', parent, hash])
       : await git(repo, ['diff-tree', '-r', '--root', '--no-commit-id', '--name-status', hash])
@@ -264,7 +266,7 @@ app.get('/api/commit', repoGuard, async (req, res) => {
       const cols = l.split('\t')
       return { status: cols[0][0], path: cols[cols.length - 1] }
     })
-    res.json({ files })
+    res.json({ files, meta })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
   }
