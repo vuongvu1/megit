@@ -224,7 +224,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         </button>
         <ThemeSwitch />
       </div>
-      <div className="panes" style={{ '--graph-w': `${graphPct}%` } as CSSProperties}>
+      <div className="panes" style={{ '--graph-w': selection ? `${graphPct}%` : '100%' } as CSSProperties}>
         <div className="graph-pane" style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
           <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} />
           <div className="col-splitter" style={{ left: refsW + 9 }} onPointerDown={onSplitDown} onPointerMove={onRefsMove} />
@@ -239,8 +239,12 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
             </div>
           )}
         </div>
-        <div className="splitter" onPointerDown={onSplitDown} onPointerMove={onSplitMove} />
-        <CommitPanel selection={selection} status={status} repo={repo} file={file} onFileSelect={setFile} />
+        {selection && (
+          <>
+            <div className="splitter" onPointerDown={onSplitDown} onPointerMove={onSplitMove} />
+            <CommitPanel selection={selection} status={status} repo={repo} file={file} onFileSelect={setFile} />
+          </>
+        )}
       </div>
       {termOpen && <Suspense fallback={<div className="term-panel" />}><TerminalPanel repo={repo} onClose={toggleTerm} /></Suspense>}
     </div>

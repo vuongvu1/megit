@@ -97,7 +97,7 @@ export default function CommitPanel({ repo, selection, status, file, onFileSelec
     return c
   }, [files])
 
-  if (!selection) return <div className="panel empty">Select a commit</div>
+  if (!selection) return null // parent hides the panel; kept for type narrowing
 
   const setViewPersist = (v: 'path' | 'tree') => {
     setView(v)

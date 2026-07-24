@@ -83,7 +83,7 @@ type Dash = { lane: number; end: boolean } // WIP/stash connector passing throug
 const emph = (mode: boolean, on: boolean) =>
   mode ? (on ? { strokeWidth: 3 } : { strokeWidth: 2, strokeOpacity: 0.4 }) : { strokeWidth: 2 }
 
-function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail }: {
+function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail, tooltip }: {
   row: LaneRow
   width: number
   avatarUrl: string | null
@@ -91,6 +91,7 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail }: {
   clipId: string
   dashes: Dash[]
   trail: TrailRow | null
+  tooltip?: string
 }) {
   const x = (l: number) => l * COL + COL / 2
   const mid = ROW / 2
@@ -112,9 +113,12 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail }: {
         <path key={`o${l}`} d={`M ${x(row.lane)} ${mid} C ${x(l)} ${ROW}, ${x(l)} ${mid}, ${x(l)} ${ROW}`} stroke={color(l)} {...emph(!!trail, !!trail?.outgoing && l === row.lane)} fill="none" />
       ))}
       {label === null ? (
-        <circle cx={cx} cy={mid} r="4" fill={c} />
+        <circle cx={cx} cy={mid} r="4" fill={c}>
+          {tooltip && <title>{tooltip}</title>}
+        </circle>
       ) : (
-        <>
+        <g>
+          {tooltip && <title>{tooltip}</title>}
           {avatarUrl ? (
             <>
               <clipPath id={clipId}>
@@ -138,14 +142,22 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail }: {
             </>
           )}
           <circle cx={cx} cy={mid} r={AV_R} fill="none" stroke={c} strokeWidth="1.5" />
-        </>
+        </g>
       )}
     </svg>
   )
 }
 
-const fmtDate = (unix: number) =>
-  new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
+const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+const fmtDate = (unix: number) => {
+  const secs = Math.floor(Date.now() / 1000) - unix
+  if (secs >= 0 && secs < 7 * 86400) {
+    if (secs < 3600) return rtf.format(-Math.floor(secs / 60), 'minute')
+    if (secs < 86400) return rtf.format(-Math.floor(secs / 3600), 'hour')
+    return rtf.format(-Math.floor(secs / 86400), 'day')
+  }
+  return new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
+}
 
 function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onBusy }: {
   repo: string
@@ -214,10 +226,9 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
         />
       )}
       <span className="graph-col">
-        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} dashes={dashes} trail={trail} />
+        <GraphCell row={row} width={width} avatarUrl={avatarUrl} label={isMerge ? null : initials(c.author)} clipId={`av-${c.hash.slice(0, 12)}`} dashes={dashes} trail={trail} tooltip={c.author} />
       </span>
       <span className="subject" title={c.subject}>{c.subject}</span>
-      <span className="author">{c.author}</span>
       <span className="date">{fmtDate(c.date)}</span>
       <span className="hash">{c.hash.slice(0, 7)}</span>
     </div>
@@ -263,6 +274,8 @@ function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSele
         </svg>
       </span>
       <span className="subject" title={s.subject}>{s.subject}</span>
+      <span className="date">{fmtDate(s.date)}</span>
+      <span className="hash">{s.hash.slice(0, 7)}</span>
     </div>
   )
 }
@@ -337,7 +350,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   return (
     <div className="graphview">
       {showWip && (
-        <div className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`} onClick={() => onSelect({ kind: 'wip' })}>
+        <div className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`} onClick={() => onSelect(selection?.kind === 'wip' ? null : { kind: 'wip' })}>
           <span className="refs" onClick={e => e.stopPropagation()} />
           <span className="graph-col">
             <svg width={width} height={ROW} className="graph-cell">
@@ -363,7 +376,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
                 dashes={stashDashesFor(i, k)}
                 trailLane={trail ? (trail[i].through >= 0 ? trail[i].through : trail[i].incoming) : null}
                 selected={selection?.kind === 'commit' && selection.hash === p.s.hash}
-                onSelect={() => onSelect({ kind: 'commit', hash: p.s.hash })}
+                onSelect={() => onSelect(selection?.kind === 'commit' && selection.hash === p.s.hash ? null : { kind: 'commit', hash: p.s.hash })}
               />
             ))}
             <CommitRow
@@ -373,7 +386,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
               width={width}
               remotes={remotes}
               selected={selection?.kind === 'commit' && selection.hash === c.hash}
-              onSelect={() => onSelect({ kind: 'commit', hash: c.hash })}
+              onSelect={() => onSelect(selection?.kind === 'commit' && selection.hash === c.hash ? null : { kind: 'commit', hash: c.hash })}
               dashes={dashesFor(i)}
               trail={trail ? trail[i] : null}
               onBusy={onBusy}
