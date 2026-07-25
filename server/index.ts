@@ -128,13 +128,16 @@ app.get('/api/graph', repoGuard, async (req, res) => {
       return { hash, parent: parents.split(' ')[0], date: Number(date), subject }
     })
     const [raw, remoteRaw, originUrl] = await Promise.all([
-      // --exclude before --all: stash commits render as dedicated stash rows, not log rows.
+      // Whitelist the tips, don't use --all: --all means every ref under refs/, which drags in
+      // tool-written namespaces (agent checkpoints, refs/prefetch from git maintenance, refs/bisect)
+      // that are noise in the graph — and each parentless one burns a lane. HEAD covers detached.
       // Stash bases are added as explicit tips — a reset/dropped branch can leave a base
-      // reachable only through its stash, and it must still show in the graph.
+      // reachable only through its stash, and it must still show in the graph. The stash commits
+      // themselves stay out (refs/stash isn't a branch/tag/remote) and render as stash rows.
       // --date-order: children still precede parents (lane layout invariant), but
       // branches interleave by commit date, GitKraken-style — --topo-order would list
       // HEAD's whole branch chain before any other branch appears.
-      git(repo, ['log', '--exclude=refs/stash', '--all', ...stashes.map(s => s.parent), '--date-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
+      git(repo, ['log', 'HEAD', '--branches', '--tags', '--remotes', ...stashes.map(s => s.parent), '--date-order', `--skip=${skip}`, `--max-count=${limit + 1}`, `--format=${LOG_FORMAT}`]),
       git(repo, ['remote']),
       git(repo, ['remote', 'get-url', 'origin']).catch(() => ''),
     ])
