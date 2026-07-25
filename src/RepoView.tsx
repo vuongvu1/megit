@@ -3,10 +3,11 @@ import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api } from './api'
 import GraphView from './GraphView'
 import CommitPanel from './CommitPanel'
-import DiffView from './DiffView'
 import ThemeSwitch from './ThemeSwitch'
 
-// xterm.js + panel stay out of the main bundle until the terminal is first opened
+// diff2html + highlight.js (~1 MB, 82% of the old main bundle) stay out until a
+// file is actually clicked; xterm.js + panel likewise until the terminal opens
+const DiffView = lazy(() => import('./DiffView'))
 const TerminalPanel = lazy(() => import('./TerminalPanel'))
 
 export type Selection = { kind: 'commit'; hash: string } | { kind: 'wip' } | null
@@ -173,13 +174,15 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         if (g !== gen.current) return
         setCommits(prev => {
           const next = [...prev, ...res.commits]
-          fps.current.graph = graphFp(next, res.hasMore)
+          // stashes must go in: refresh computes the fp with them, and a mismatch
+          // here means every later SSE tick re-renders the whole list for nothing
+          fps.current.graph = graphFp(next, res.hasMore, stashes)
           return next
         })
         setHasMore(res.hasMore)
       })
       .catch(e => { if (g !== gen.current) return; setError({ msg: e.message, gone: false }) })
-  }, [q])
+  }, [q, stashes])
 
   if (error) {
     return (
@@ -235,7 +238,9 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
                 <span className="file-path">{file}</span>
                 <button className="diff-close" onClick={() => setFile(null)} title="Close diff">✕</button>
               </div>
-              <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file} wipTick={wipTick} />
+              <Suspense fallback={<div className="diffview empty">Loading…</div>}>
+                <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file} wipTick={wipTick} />
+              </Suspense>
             </div>
           )}
         </div>

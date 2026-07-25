@@ -3,12 +3,17 @@
 import { watch } from 'node:fs'
 import type { FSWatcher } from 'node:fs'
 
+// dependency/build dirs git will never report on: an install or a bundler watch
+// otherwise pins the debouncer's max-wait cap and refetches the graph every 2 s
+const NOISE = /^(node_modules|dist|build|target|out|coverage|\.next|\.nuxt|\.turbo|\.venv|__pycache__)(\/|$)/
+
 // rel is '/'-separated relative to the repo root (fs.watch recursive on macOS).
-// Working-tree paths all count — including git-ignored dirs; over-notifying is
-// fine because the client refetch is cheap and fingerprint-gated.
+// Working-tree paths count — including git-ignored ones; over-notifying is fine
+// because the client refetch is cheap and fingerprint-gated. Exception: NOISE.
 // Inside .git only the ref/index surface counts; objects/lock/log churn is noise.
 export function isRelevant(rel: string): boolean {
   if (rel === '.git') return false
+  if (NOISE.test(rel)) return false
   if (!rel.startsWith('.git/')) return true
   const inner = rel.slice('.git/'.length)
   return inner === 'HEAD' || inner === 'index' || inner === 'packed-refs' || inner.startsWith('refs/')

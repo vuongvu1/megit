@@ -8,11 +8,17 @@ import { subscribe, activeWatcherCount } from './watch.ts'
 
 describe('isRelevant', () => {
   it.each<[string, boolean]>([
-    // working tree: everything counts, including git-ignored dirs (over-notify by design)
+    // working tree: everything counts, including git-ignored files (over-notify by design)
     ['src/App.tsx', true],
     ['README.md', true],
-    ['node_modules/x/index.js', true],
     ['.gitignore', true],
+    ['distributed/x.ts', true], // NOISE matches whole segments only
+    ['src/node_modules_helper.ts', true],
+    // …except dependency/build dirs, whose churn git never reports on
+    ['node_modules/x/index.js', false],
+    ['node_modules', false],
+    ['dist/assets/index.js', false],
+    ['.next/cache/x', false],
     // .git internals: only the ref/index surface counts
     ['.git/HEAD', true],
     ['.git/index', true],

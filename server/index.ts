@@ -13,6 +13,22 @@ import { wireTerminal } from './term.ts'
 const app = express()
 app.use(express.json())
 
+// The server listens on loopback only, but that alone doesn't stop a page on
+// attacker.tld from rebinding its DNS to 127.0.0.1: the browser then treats this
+// API as same-origin and CORS never applies. Pinning Host closes that — a rebound
+// request still carries the attacker's hostname. (/api/term does the same with Origin.)
+app.use((req, res, next) => {
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(req.headers.host ?? '')) {
+    res.status(403).json({ error: 'forbidden host' })
+    return
+  }
+  next()
+})
+
+// git treats a leading-dash rev as an option (`git diff --output=<file>` writes files),
+// so revs from the client are whitelisted rather than escaped
+const isSha = (s: string) => /^[0-9a-f]{4,40}$/.test(s)
+
 function git(repo: string, args: string[], okCodes: number[] = [0]): Promise<string> {
   return new Promise((res, rej) => {
     execFile('git', ['-C', repo, ...args], { maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -255,6 +271,10 @@ async function firstParent(repo: string, hash: string): Promise<string | null> {
 app.get('/api/commit', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const hash = String(req.query.hash ?? '')
+  if (!isSha(hash)) {
+    res.status(400).json({ error: 'invalid hash' })
+    return
+  }
   try {
     // one show call yields message/author/committer AND the parent list for the diff
     const meta = parseMeta(await git(repo, ['show', '-s', `--format=${META_FORMAT}`, hash]))
@@ -278,6 +298,10 @@ app.get('/api/diff', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const hash = req.query.hash ? String(req.query.hash) : null
   const file = String(req.query.file ?? '')
+  if (hash !== null && !isSha(hash)) {
+    res.status(400).json({ error: 'invalid hash' })
+    return
+  }
   try {
     let diff: string
     if (hash) {
