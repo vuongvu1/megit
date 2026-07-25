@@ -8,11 +8,22 @@ import { useTheme } from './theme'
 // and only downloads the first time a terminal is opened
 
 const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+// xterm's built-in ANSI palette assumes a dark background — brightWhite (#fff) and
+// brightYellow (#ff0) are unreadable on the light theme. GitHub Primer light ANSI:
+const lightAnsi = {
+  black: '#24292f', red: '#cf222e', green: '#116329', yellow: '#4d2d00',
+  blue: '#0969da', magenta: '#8250df', cyan: '#1b7c83', white: '#6e7781',
+  brightBlack: '#57606a', brightRed: '#a40e26', brightGreen: '#1a7f37', brightYellow: '#633c01',
+  brightBlue: '#218bff', brightMagenta: '#a475f9', brightCyan: '#3192aa', brightWhite: '#8c959f',
+}
+
 const xtermTheme = () => ({
   background: cssVar('--bg'),
   foreground: cssVar('--fg'),
   cursor: cssVar('--fg'),
   selectionBackground: cssVar('--bg-selected'),
+  ...(document.documentElement.dataset.theme === 'light' ? lightAnsi : null),
 })
 
 export default function TerminalPanel({ repo, onClose }: { repo: string; onClose: () => void }) {
