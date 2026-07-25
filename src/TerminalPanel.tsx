@@ -104,7 +104,16 @@ export default function TerminalPanel({ repo, onClose }: { repo: string; onClose
   return (
     <div className="term-panel" style={{ height }}>
       <div className="term-resizer" onPointerDown={onResizeDown} onPointerMove={onResizeMove} />
-      <button className="term-close" onClick={onClose} title="Close terminal (⌘J)" aria-label="Close terminal">✕</button>
+      <div className="term-head">
+        <span className="term-title">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 17l6-5-6-5" />
+            <path d="M12 19h8" />
+          </svg>
+          Terminal
+        </span>
+        <button className="term-close" onClick={onClose} title="Close terminal (⌘J)" aria-label="Close terminal">✕</button>
+      </div>
       <div className="term-host" ref={hostRef} />
     </div>
   )
