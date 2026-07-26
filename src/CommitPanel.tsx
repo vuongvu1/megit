@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CommitMeta, StatusEntry } from '../server/parse.ts'
-import { api } from './api'
+import { api, jsonInit } from './api'
 import { useAvatar, initials } from './avatar'
 import type { Selection } from './RepoView'
 import { buildTree, type TreeNode } from './tree'
@@ -10,6 +10,13 @@ const COUNT_LABEL: [string, string, string][] = [['M', 'modified', '#e5c07b'], [
 
 const fmtWhen = (unix: number) =>
   new Date(unix * 1000).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+const PencilIcon = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.4 1.9l2.7 2.7-8.5 8.5-3.3.6.6-3.3z" />
+    <path d="M9.5 3.8l2.7 2.7" />
+  </svg>
+)
 
 function Face({ repo, name, email }: { repo: string; name: string; email: string }) {
   const url = useAvatar(repo, email)
@@ -68,18 +75,29 @@ function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect }: {
   )
 }
 
-export default function CommitPanel({ repo, selection, status, file, onFileSelect }: { repo: string; selection: Selection; status: StatusEntry[]; file: string | null; onFileSelect: (file: string) => void }) {
+export default function CommitPanel({ repo, selection, status, file, onFileSelect, canAmend, onAmended }: {
+  repo: string
+  selection: Selection
+  status: StatusEntry[]
+  file: string | null
+  onFileSelect: (file: string) => void
+  canAmend: boolean // selection is the tip of the checked-out branch
+  onAmended: (hash: string) => void
+}) {
   const [fetched, setFetched] = useState<StatusEntry[]>([])
   const [meta, setMeta] = useState<CommitMeta | null>(null)
   const [error, setError] = useState('')
   const [view, setView] = useState<'path' | 'tree'>(() => (localStorage.getItem('megit-files-view') === 'tree' ? 'tree' : 'path'))
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [draft, setDraft] = useState<string | null>(null) // null = not editing
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setError('')
     setFetched([])
     setMeta(null)
     setCollapsed(new Set())
+    setDraft(null)
     if (selection?.kind !== 'commit') return
     api<{ files: StatusEntry[]; meta: CommitMeta }>(`/api/commit?repo=${encodeURIComponent(repo)}&hash=${selection.hash}`)
       .then(r => { setFetched(r.files); setMeta(r.meta) })
@@ -115,14 +133,66 @@ export default function CommitPanel({ repo, selection, status, file, onFileSelec
   const bodyText = body.join('\n').trim()
   const coAuthored = meta && (meta.committer !== meta.author || meta.committerEmail !== meta.authorEmail)
 
+  const save = () => {
+    if (selection.kind !== 'commit') return
+    const message = (draft ?? '').trim()
+    if (!message || message === (meta?.message ?? '').trim()) {
+      setDraft(null)
+      return
+    }
+    const post = (force: boolean) =>
+      api<{ hash: string }>(`/api/commit?repo=${encodeURIComponent(repo)}`, jsonInit('POST', { action: 'amend', hash: selection.hash, message, force }))
+    setSaving(true)
+    setError('')
+    post(false)
+      .catch((err: Error) => {
+        // amending a pushed commit is a second, explicit decision
+        if (!/already pushed/.test(err.message)) throw err
+        return confirm(`This commit is ${err.message}.\n\nEditing it rewrites its sha, so the remote would need a force push — which megit won't do for you.\n\nEdit anyway?`)
+          ? post(true)
+          : null
+      })
+      .then(r => { if (r) { setDraft(null); onAmended(r.hash) } })
+      .catch((err: Error) => setError(`Edit message failed: ${err.message}`))
+      .finally(() => setSaving(false))
+  }
+
   return (
     <div className="panel">
       {error && <div className="error">{error}</div>}
       {selection.kind === 'commit' && meta && (
         <>
           <div className="commit-msg">
-            <div className="commit-subject">{subject}</div>
-            {bodyText && <div className="commit-body">{bodyText}</div>}
+            {draft === null ? (
+              <>
+                <div className="commit-subject">{subject}</div>
+                {bodyText && <div className="commit-body">{bodyText}</div>}
+                {canAmend && (
+                  <button className="msg-edit" title="Edit message (amends this commit)" aria-label="Edit message" onClick={() => setDraft(meta.message)}>
+                    <PencilIcon />
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <textarea
+                  className="msg-box"
+                  value={draft}
+                  autoFocus
+                  disabled={saving}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') setDraft(null)
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
+                  }}
+                />
+                <div className="msg-actions">
+                  <span className="msg-hint">⌘↵ save · esc cancel</span>
+                  <button onClick={() => setDraft(null)} disabled={saving}>Cancel</button>
+                  <button className="primary" onClick={save} disabled={saving || !draft.trim()}>Save</button>
+                </div>
+              </>
+            )}
           </div>
           <div className="commit-people">
             <Person repo={repo} name={meta.author} email={meta.authorEmail} verb="authored" date={meta.authorDate} />

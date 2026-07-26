@@ -103,6 +103,9 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   // the same object when unchanged) — so this closes the diff exactly then
   useEffect(() => { setFile(null) }, [selection])
 
+  // "HEAD -> name" only: a detached HEAD shows as plain "HEAD" and has no tip to amend
+  const headCommit = commits.find(c => c.refs.some(r => r.startsWith('HEAD -> ')))
+
   // auto-refresh: SSE signal → refetch; hidden tab defers to one refetch on return.
   // refresh's identity only changes with q (both derive from the stable `repo` prop —
   // App remounts RepoView by key), so these deps never tear down the connection on their own.
@@ -129,7 +132,10 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && (e.target as HTMLElement).tagName !== 'INPUT') refresh()
+      // TEXTAREA as well as INPUT: the commit-message editor is a textarea, and
+      // typing "r" in it must not trigger a refresh
+      const tag = (e.target as HTMLElement).tagName
+      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && tag !== 'INPUT' && tag !== 'TEXTAREA') refresh()
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyJ') {
         e.preventDefault() // keep Chrome's downloads panel closed
         toggleTerm()
@@ -247,7 +253,17 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         {selection && (
           <>
             <div className="splitter" onPointerDown={onSplitDown} onPointerMove={onSplitMove} />
-            <CommitPanel selection={selection} status={status} repo={repo} file={file} onFileSelect={setFile} />
+            <CommitPanel
+              selection={selection}
+              status={status}
+              repo={repo}
+              file={file}
+              onFileSelect={setFile}
+              canAmend={selection?.kind === 'commit' && selection.hash === headCommit?.hash}
+              // amending rewrites the sha: follow the selection to the new commit,
+              // otherwise the refresh below drops it as a commit that no longer exists
+              onAmended={hash => { setSelection({ kind: 'commit', hash }); refresh() }}
+            />
           </>
         )}
       </div>

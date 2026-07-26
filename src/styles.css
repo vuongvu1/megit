@@ -142,9 +142,17 @@ button:hover { background: var(--border); }
 
 .panel { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
-.commit-msg { padding: 10px 12px; border-bottom: 1px solid var(--border); max-height: 30%; overflow-y: auto; flex-shrink: 0; }
+.commit-msg { position: relative; padding: 10px 12px; border-bottom: 1px solid var(--border); max-height: 30%; overflow-y: auto; flex-shrink: 0; }
 .commit-subject { font-weight: 600; }
 .commit-body { margin-top: 8px; white-space: pre-wrap; color: var(--fg-dim); font-size: 13px; }
+/* edit affordance: out of the way until the message block is hovered */
+.msg-edit { position: absolute; top: 6px; right: 8px; display: flex; padding: 3px; line-height: 0; color: var(--fg-dim); opacity: 0; transition: opacity .1s; }
+.msg-edit:hover { color: var(--fg); }
+.commit-msg:hover .msg-edit, .msg-edit:focus-visible { opacity: 1; }
+.msg-box { display: block; width: 100%; min-height: 84px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); font: inherit; resize: vertical; }
+.msg-actions { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.msg-hint { flex: 1; color: var(--fg-faint); font-size: 12px; }
+.msg-actions .primary { background: var(--head-bg); color: var(--head-fg); border-color: var(--head-fg); }
 
 .commit-people { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; }
 .person { display: flex; align-items: center; gap: 8px; min-width: 0; }

@@ -412,6 +412,29 @@ app.post('/api/commit', repoGuard, async (req, res) => {
       case 'tag':
         await git(repo, ['tag', await newRefName(repo, req.body.name, 'tag'), sha])
         break
+      case 'amend': {
+        // only the tip is amendable — anything older needs a rebase, which this isn't
+        if (sha !== (await git(repo, ['rev-parse', 'HEAD'])).trim()) throw httpError(409, 'only the latest commit can be edited')
+        if (!(await git(repo, ['branch', '--show-current'])).trim()) throw httpError(409, 'detached HEAD — check out a branch first')
+        const message = String(req.body.message ?? '').trim()
+        if (!message) throw httpError(400, 'empty commit message')
+        if (req.body.force !== true) {
+          // rewriting a pushed commit leaves the remote needing a force push, which
+          // megit never does — so the client has to ask again before this proceeds
+          const onRemote = (await git(repo, ['branch', '-r', '--contains', sha]))
+            .split('\n').map(s => s.trim())
+            // drop the "origin/HEAD -> origin/main" symref line: it's a pointer, not a second branch
+            .filter(r => r && !r.includes(' -> '))
+          if (onRemote.length) throw httpError(409, `already pushed to ${onRemote.join(', ')}`)
+        }
+        // --only: a plain --amend folds whatever is staged into the rewritten commit,
+        // so editing a message with unrelated work staged would quietly commit it.
+        // --no-verify: nothing changes in the tree, so pre-commit has nothing to check.
+        // --message=: the value can't be read as a flag, and carries newlines fine.
+        await git(repo, ['commit', '--amend', '--only', '--no-verify', `--message=${message}`], [0], NET_TIMEOUT)
+        res.json({ ok: true, hash: (await git(repo, ['rev-parse', 'HEAD'])).trim() })
+        return
+      }
       case 'reset': {
         const mode = req.body.mode
         if (mode !== 'soft' && mode !== 'mixed' && mode !== 'hard') throw httpError(400, 'invalid reset mode')
