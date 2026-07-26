@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 
-export type MenuItem = { label: string; danger?: boolean; onClick: () => void }
+export type MenuItem = { label: string; danger?: boolean; sep?: boolean; onClick: () => void }
 
 // popover for the top layer only (the menu escapes row overflow and the graph's
 // stacking context), and `manual` rather than `auto`: on macOS `contextmenu` fires
@@ -43,7 +43,7 @@ export default function ContextMenu({ x, y, items, onClose }: {
       {items.map(it => (
         <button
           key={it.label}
-          className={`ctx-item${it.danger ? ' danger' : ''}`}
+          className={`ctx-item${it.danger ? ' danger' : ''}${it.sep ? ' sep' : ''}`}
           onClick={() => { onClose(); it.onClick() }}
         >
           {it.label}

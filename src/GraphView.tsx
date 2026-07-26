@@ -2,6 +2,7 @@ import { Fragment, memo, useMemo, useState, type MouseEvent as ReactMouseEvent }
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
 import ContextMenu, { type MenuItem } from './ContextMenu'
+import { branchMenu, type RefChip } from './branchMenu'
 import { layout, stashSlot, activeTrail, type LaneRow, type TrailRow } from './lanes'
 import type { Selection } from './RepoView'
 import { useAvatar, initials } from './avatar'
@@ -11,8 +12,6 @@ const COL = 18
 const AV_R = 10
 const COLORS = ['#61afef', '#98c379', '#e06c75', '#c678dd', '#e5c07b', '#56b6c2', '#d19a66', '#f47067']
 const color = (l: number) => COLORS[l % COLORS.length]
-
-type RefChip = { name: string; local: boolean; remote: boolean; tag: boolean; head: boolean }
 
 // %D entries: "HEAD -> main", "main", "origin/main", "tag: v1.0", "HEAD" (detached).
 // Local + remote refs with the same branch name merge into one chip with both icons.
@@ -160,7 +159,7 @@ const fmtDate = (unix: number) => {
   return new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 }
 
-function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onBusy }: {
+function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onCheckout, onChipMenu }: {
   repo: string
   c: Commit
   row: LaneRow
@@ -170,7 +169,8 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   onSelect: () => void
   dashes: Dash[]
   trail: TrailRow | null
-  onBusy: (p: Promise<unknown>) => void
+  onCheckout: (branch: string) => void
+  onChipMenu: (e: ReactMouseEvent, chip: RefChip, hash: string) => void
 }) {
   const isMerge = c.parents.length > 1
   const avatarUrl = useAvatar(repo, isMerge ? null : c.email)
@@ -186,24 +186,9 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
             key={chip.name}
             className={`ref-chip${chip.head ? ' head' : ''}`}
             style={{ borderColor: color(row.lane) }}
-            title={canCheckout ? `${chip.name} — double-click to checkout` : chip.name}
-            onDoubleClick={canCheckout ? () => {
-              // onBusy refetches on settle; the later fs.watch → SSE refresh is a fingerprint no-op
-              type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number }
-              const checkout = (body: object) =>
-                api<CheckoutRes>(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
-              onBusy(checkout({ branch: chip.name })
-                .then(r => {
-                  if (!r.diverged) return
-                  // ponytail: native confirm as the popup; custom modal when it grates
-                  const ok = confirm(
-                    `Local '${chip.name}' differs from ${r.remoteRef} (${r.ahead} ahead, ${r.behind} behind).\n\n` +
-                    `OK — Reset local to ${r.remoteRef} (uncommitted changes go to a stash)\nCancel — keep everything as is`,
-                  )
-                  if (ok) return checkout({ branch: chip.name, reset: true })
-                })
-                .catch(err => alert(`Checkout failed:\n${(err as Error).message}`))) // ponytail: alert; inline toast if it grates
-            } : undefined}
+            title={canCheckout ? `${chip.name} — double-click to checkout, right-click for actions` : `${chip.name} — right-click for actions`}
+            onDoubleClick={canCheckout ? () => onCheckout(chip.name) : undefined}
+            onContextMenu={e => onChipMenu(e, chip, c.hash)}
           >
             {chip.head && <CheckIcon />}
             <span className="ref-name">{chip.name}</span>
@@ -282,12 +267,13 @@ function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSele
   )
 }
 
-function GraphView({ repo, commits, status, remotes, stashes, selection, onSelect, onLoadMore, hasMore, onBusy }: {
+function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selection, onSelect, onLoadMore, hasMore, onBusy }: {
   repo: string
   commits: Commit[]
   status: StatusEntry[]
   remotes: string[]
   stashes: StashEntry[]
+  githubUrl: string | null
   selection: Selection
   onSelect: (s: Selection) => void
   onLoadMore: () => void
@@ -296,6 +282,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
 }) {
   const headIdx = useMemo(() => commits.findIndex(c => c.refs.some(r => r === 'HEAD' || r.startsWith('HEAD -> '))), [commits])
   const headHash = headIdx >= 0 ? commits[headIdx].hash : undefined
+  const headBranch = (headIdx >= 0 && commits[headIdx].refs.find(r => r.startsWith('HEAD -> '))?.slice(8)) || null
   const showWip = status.length > 0
   // items are built at open time, so the menu itself stays generic — commit and
   // branch menus are a different array through the same openMenu
@@ -321,13 +308,78 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   const wipItems = (): MenuItem[] => [{
     label: 'Stash changes',
     onClick: () => {
-      const branch = commits[headIdx]?.refs.find(r => r.startsWith('HEAD -> '))?.slice(8)
       // ponytail: native prompt as the naming dialog; nothing is lost on cancel
-      const message = prompt('Stash message', `WIP on ${branch ?? 'HEAD'}`)
+      const message = prompt('Stash message', `WIP on ${headBranch ?? 'HEAD'}`)
       if (message === null) return
       stashApi({ action: 'push', message }, 'save')
     },
   }]
+
+  // onBusy refetches on settle; the later fs.watch → SSE refresh is a fingerprint no-op
+  const branchPost = (body: object) =>
+    api(`/api/branch?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
+  const branchApi = (body: object, label: string) =>
+    onBusy(branchPost(body).catch(err => alert(`${label} failed:\n${(err as Error).message}`)))
+  const checkout = (branch: string) => {
+    type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number }
+    const post = (body: object) =>
+      api<CheckoutRes>(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
+    onBusy(post({ branch })
+      .then(r => {
+        if (!r.diverged) return
+        // ponytail: native confirm as the popup; custom modal when it grates
+        const ok = confirm(
+          `Local '${branch}' differs from ${r.remoteRef} (${r.ahead} ahead, ${r.behind} behind).\n\n` +
+          `OK — Reset local to ${r.remoteRef} (uncommitted changes go to a stash)\nCancel — keep everything as is`,
+        )
+        if (ok) return post({ branch, reset: true })
+      })
+      .catch(err => alert(`Checkout failed:\n${(err as Error).message}`))) // ponytail: alert; inline toast if it grates
+  }
+  const chipItems = (chip: RefChip, hash: string): MenuItem[] => branchMenu(chip, {
+    current: headBranch,
+    hasRemote: remotes.length > 0,
+    canLink: !!githubUrl,
+    run: action => {
+      switch (action) {
+        case 'checkout': return checkout(chip.name)
+        case 'pull': return void branchApi({ action: 'pull' }, 'Pull')
+        case 'push': return void branchApi({ action: 'push' }, 'Push')
+        case 'merge': return void branchApi({ action: 'merge', branch: chip.name }, 'Merge')
+        case 'rebase': return void branchApi({ action: 'rebase', branch: chip.name }, 'Rebase')
+        case 'upstream': {
+          const upstream = prompt(`Track which remote branch?`, `${remotes[0] ?? 'origin'}/${chip.name}`)
+          if (upstream) branchApi({ action: 'upstream', branch: chip.name, upstream }, 'Set upstream')
+          return
+        }
+        case 'create': {
+          const name = prompt(`New branch at ${hash.slice(0, 7)}`, '')
+          if (name) branchApi({ action: 'create', name, at: hash }, 'Create branch')
+          return
+        }
+        case 'rename': {
+          const name = prompt(`Rename ${chip.name} to`, chip.name)
+          if (name && name !== chip.name) branchApi({ action: 'rename', branch: chip.name, name }, 'Rename')
+          return
+        }
+        case 'delete': {
+          if (!confirm(`Delete branch ${chip.name}?`)) return
+          const del = (force = false) => branchPost({ action: 'delete', branch: chip.name, force })
+          // git's -d refuses unmerged work; forcing past that is a second, explicit decision
+          onBusy(del()
+            .catch((err: Error) => {
+              if (!/not fully merged/.test(err.message)) throw err
+              if (confirm(`${chip.name} is not fully merged.\n\nDelete anyway? Its commits stay reachable only through the reflog.`)) return del(true)
+            })
+            .catch((err: Error) => alert(`Delete branch failed:\n${err.message}`)))
+          return
+        }
+        case 'copyName': return void navigator.clipboard.writeText(chip.name)
+        case 'copyLink': return void navigator.clipboard.writeText(`${githubUrl}/${chip.tag ? 'releases/tag' : 'tree'}/${chip.name}`)
+      }
+    },
+  })
+
   // pin HEAD's branch to lane 0 and reserve one lane per dotted connector
   // anchored to it (WIP, then HEAD-based stashes) — each runs straight down
   // into the checked-out branch, GitKraken-style, instead of routing around
@@ -427,7 +479,8 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
               onSelect={() => onSelect(selection?.kind === 'commit' && selection.hash === c.hash ? null : { kind: 'commit', hash: c.hash })}
               dashes={dashesFor(i)}
               trail={trail ? trail[i] : null}
-              onBusy={onBusy}
+              onCheckout={checkout}
+              onChipMenu={(e, chip, hash) => openMenu(e, chipItems(chip, hash))}
             />
           </Fragment>
         )

@@ -29,10 +29,23 @@ app.use((req, res, next) => {
 // so revs from the client are whitelisted rather than escaped
 const isSha = (s: string) => /^[0-9a-f]{4,40}$/.test(s)
 
-function git(repo: string, args: string[], okCodes: number[] = [0]): Promise<string> {
+// No git invocation may block on a prompt: a passphrase-protected key, an expired
+// token or a missing credential helper has to fail fast. Without these, a push
+// waits on stdin that no one is attached to and the request never returns.
+const GIT_ENV = {
+  ...process.env,
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_ASKPASS: 'echo',
+  SSH_ASKPASS: 'echo',
+  GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
+}
+
+function git(repo: string, args: string[], okCodes: number[] = [0], timeout = 0): Promise<string> {
   return new Promise((res, rej) => {
-    execFile('git', ['-C', repo, ...args], { maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err && !okCodes.includes(typeof err.code === 'number' ? err.code : 1)) {
+    execFile('git', ['-C', repo, ...args], { maxBuffer: 50 * 1024 * 1024, env: GIT_ENV, timeout }, (err, stdout, stderr) => {
+      if (err && (err as { killed?: boolean }).killed) {
+        rej(new Error(`git ${args[0]} timed out after ${timeout / 1000}s`))
+      } else if (err && !okCodes.includes(typeof err.code === 'number' ? err.code : 1)) {
         rej(new Error(stderr.trim() || err.message))
       } else res(stdout)
     })
@@ -265,6 +278,99 @@ app.post('/api/stash', repoGuard, async (req, res) => {
   } catch (e) {
     // conflicting pop leaves the stash in place and markers in the tree — git says so
     res.status(409).json({ error: (e as Error).message })
+  }
+})
+
+const NET_TIMEOUT = 30_000
+
+// same shape the client's api() throws — an Error carrying the status to send
+const httpError = (status: number, msg: string) => Object.assign(new Error(msg), { status })
+
+// An existing branch is only ever addressed by a string git itself printed —
+// the request supplies a name, and it has to match one of these exactly.
+const knownRefs = async (repo: string, ...args: string[]) =>
+  (await git(repo, ['for-each-ref', '--format=%(refname:short)', ...args])).split('\n').filter(Boolean)
+
+const mustExist = (refs: string[], name: unknown, kind: string) => {
+  const s = String(name ?? '')
+  if (!refs.includes(s)) throw httpError(400, `unknown ${kind}: ${s}`)
+  return s
+}
+
+// A new name is the one string git hasn't produced itself: reject option-like
+// names so it can't be read as a flag, then let git's own validator rule on the
+// rest rather than re-deriving refname syntax in a regex here.
+async function newBranchName(repo: string, raw: unknown): Promise<string> {
+  const name = String(raw ?? '').trim()
+  if (!name || name.startsWith('-')) throw httpError(400, 'invalid branch name')
+  const out = (await git(repo, ['check-ref-format', '--branch', name], [0, 128])).trim()
+  if (!out) throw httpError(400, `'${name}' is not a valid branch name`)
+  return out
+}
+
+app.post('/api/branch', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const action = String(req.body.action ?? '')
+  const locals = () => knownRefs(repo, 'refs/heads')
+  try {
+    switch (action) {
+      case 'create': {
+        const at = String(req.body.at ?? '')
+        if (!isSha(at)) throw httpError(400, 'invalid commit')
+        // create only, no checkout: /api/checkout stays the single path that has
+        // to reason about a dirty worktree
+        await git(repo, ['branch', await newBranchName(repo, req.body.name), at])
+        break
+      }
+      case 'rename': {
+        const branch = mustExist(await locals(), req.body.branch, 'branch')
+        await git(repo, ['branch', '-m', branch, await newBranchName(repo, req.body.name)])
+        break
+      }
+      case 'delete': {
+        const branch = mustExist(await locals(), req.body.branch, 'branch')
+        const current = (await git(repo, ['branch', '--show-current'])).trim()
+        if (branch === current) throw httpError(409, 'cannot delete the checked-out branch')
+        // -d refuses to drop unmerged work; the client re-asks and sends force
+        await git(repo, ['branch', req.body.force === true ? '-D' : '-d', branch])
+        break
+      }
+      case 'merge':
+      case 'rebase': {
+        const branch = mustExist(await locals(), req.body.branch, 'branch')
+        // --autostash, matching the auto-stash /api/checkout does — git's flag,
+        // not our own stash dance. A conflict stops and stays stopped: the files
+        // show up in the WIP row and get resolved in the terminal.
+        await git(repo, [action, '--autostash', branch])
+        break
+      }
+      case 'upstream': {
+        const branch = mustExist(await locals(), req.body.branch, 'branch')
+        const upstream = mustExist(await knownRefs(repo, 'refs/remotes'), req.body.upstream, 'remote branch')
+        await git(repo, ['branch', `--set-upstream-to=${upstream}`, branch])
+        break
+      }
+      case 'pull':
+        await git(repo, ['pull', '--ff-only', '--autostash'], [0], NET_TIMEOUT)
+        break
+      case 'push': {
+        const current = (await git(repo, ['branch', '--show-current'])).trim()
+        if (!current) throw httpError(409, 'detached HEAD — nothing to push')
+        const upstream = (await git(repo, ['rev-parse', '--abbrev-ref', `${current}@{upstream}`], [0, 128])).trim()
+        const remotes = (await git(repo, ['remote'])).split('\n').filter(Boolean)
+        // never --force. A first push with one remote sets the upstream, which is
+        // what the missing-upstream error would have told the user to do by hand
+        const args = upstream || remotes.length !== 1 ? ['push'] : ['push', '-u', remotes[0], current]
+        await git(repo, args, [0], NET_TIMEOUT)
+        break
+      }
+      default:
+        throw httpError(400, `unknown action: ${action}`)
+    }
+    res.json({ ok: true })
+  } catch (e) {
+    const err = e as Error
+    res.status((err as { status?: number }).status ?? 409).json({ error: err.message })
   }
 })
 
