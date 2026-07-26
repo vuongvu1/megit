@@ -191,6 +191,14 @@ async function revParse(repo: string, ref: string): Promise<string | null> {
   return out.trim() || null
 }
 
+// Uncommitted work goes to a stash before anything that moves the worktree, so no
+// path can fail on (or silently carry over) a dirty tree. Returns whether it stashed.
+async function stashIfDirty(repo: string, why: string): Promise<boolean> {
+  if ((await git(repo, ['status', '--porcelain'])).trim() === '') return false
+  await git(repo, ['stash', 'push', '-u', '-m', `megit: ${why}`])
+  return true
+}
+
 app.post('/api/checkout', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const branch = String(req.body.branch ?? '')
@@ -201,12 +209,8 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     return
   }
   try {
-    // uncommitted changes always go to a stash before any checkout, so no
-    // path can fail on (or silently carry over) a dirty working tree
     const dirty = (await git(repo, ['status', '--porcelain'])).trim() !== ''
-    const stashIfDirty = async (why: string) => {
-      if (dirty) await git(repo, ['stash', 'push', '-u', '-m', `megit: ${why}`])
-    }
+    const stash = (why: string) => stashIfDirty(repo, why)
     const remotes = (await git(repo, ['remote'])).split('\n').filter(Boolean)
     let remoteRef: string | null = null
     for (const r of remotes) {
@@ -218,7 +222,7 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     const hasLocal = !!(await revParse(repo, `refs/heads/${branch}`))
     if (!remoteRef || !hasLocal) {
       // plain `checkout <name>` DWIMs a remote-only branch into a local tracking branch
-      await stashIfDirty(`WIP before checkout ${branch}`)
+      await stash(`WIP before checkout ${branch}`)
       await git(repo, ['checkout', branch])
       res.json({ ok: true, stashed: dirty })
       return
@@ -227,7 +231,7 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     const remoteOnly = Number((await git(repo, ['rev-list', '--count', `refs/heads/${branch}..${remoteRef}`])).trim())
     if (localOnly === 0) {
       // equal or strictly behind: checkout, then fast-forward to the remote
-      await stashIfDirty(`WIP before checkout ${branch}`)
+      await stash(`WIP before checkout ${branch}`)
       await git(repo, ['checkout', branch])
       if (remoteOnly > 0) await git(repo, ['merge', '--ff-only', remoteRef])
       res.json({ ok: true, forwarded: remoteOnly, stashed: dirty })
@@ -238,7 +242,7 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
       res.json({ diverged: true, remoteRef, ahead: localOnly, behind: remoteOnly })
       return
     }
-    await stashIfDirty(`${branch} before reset to ${remoteRef}`)
+    await stash(`${branch} before reset to ${remoteRef}`)
     await git(repo, ['checkout', '-B', branch, remoteRef])
     res.json({ ok: true, reset: true, stashed: dirty })
   } catch (e) {
@@ -300,12 +304,25 @@ const mustExist = (refs: string[], name: unknown, kind: string) => {
 // A new name is the one string git hasn't produced itself: reject option-like
 // names so it can't be read as a flag, then let git's own validator rule on the
 // rest rather than re-deriving refname syntax in a regex here.
-async function newBranchName(repo: string, raw: unknown): Promise<string> {
+async function newRefName(repo: string, raw: unknown, kind: 'branch' | 'tag'): Promise<string> {
   const name = String(raw ?? '').trim()
-  if (!name || name.startsWith('-')) throw httpError(400, 'invalid branch name')
-  const out = (await git(repo, ['check-ref-format', '--branch', name], [0, 128])).trim()
-  if (!out) throw httpError(400, `'${name}' is not a valid branch name`)
-  return out
+  if (!name || name.startsWith('-')) throw httpError(400, `invalid ${kind} name`)
+  try {
+    await git(repo, ['check-ref-format', `refs/${kind === 'tag' ? 'tags' : 'heads'}/${name}`])
+  } catch {
+    throw httpError(400, `'${name}' is not a valid ${kind} name`)
+  }
+  return name
+}
+
+// A commit sha is checked for shape, then resolved: what reaches a mutating
+// command is the sha git printed back, and an unknown one fails here.
+async function mustResolve(repo: string, raw: unknown): Promise<string> {
+  const hash = String(raw ?? '')
+  if (!isSha(hash)) throw httpError(400, 'invalid commit')
+  const sha = await revParse(repo, `${hash}^{commit}`)
+  if (!sha) throw httpError(400, `unknown commit: ${hash}`)
+  return sha
 }
 
 app.post('/api/branch', repoGuard, async (req, res) => {
@@ -319,12 +336,12 @@ app.post('/api/branch', repoGuard, async (req, res) => {
         if (!isSha(at)) throw httpError(400, 'invalid commit')
         // create only, no checkout: /api/checkout stays the single path that has
         // to reason about a dirty worktree
-        await git(repo, ['branch', await newBranchName(repo, req.body.name), at])
+        await git(repo, ['branch', await newRefName(repo, req.body.name, 'branch'), at])
         break
       }
       case 'rename': {
         const branch = mustExist(await locals(), req.body.branch, 'branch')
-        await git(repo, ['branch', '-m', branch, await newBranchName(repo, req.body.name)])
+        await git(repo, ['branch', '-m', branch, await newRefName(repo, req.body.name, 'branch')])
         break
       }
       case 'delete': {
@@ -362,6 +379,46 @@ app.post('/api/branch', repoGuard, async (req, res) => {
         // what the missing-upstream error would have told the user to do by hand
         const args = upstream || remotes.length !== 1 ? ['push'] : ['push', '-u', remotes[0], current]
         await git(repo, args, [0], NET_TIMEOUT)
+        break
+      }
+      default:
+        throw httpError(400, `unknown action: ${action}`)
+    }
+    res.json({ ok: true })
+  } catch (e) {
+    const err = e as Error
+    res.status((err as { status?: number }).status ?? 409).json({ error: err.message })
+  }
+})
+
+app.post('/api/commit', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const action = String(req.body.action ?? '')
+  try {
+    const sha = await mustResolve(repo, req.body.hash)
+    const short = sha.slice(0, 7)
+    switch (action) {
+      case 'checkout':
+        // detaches HEAD; the client says so before asking for it
+        await stashIfDirty(repo, `WIP before checkout ${short}`)
+        await git(repo, ['checkout', sha])
+        break
+      case 'cherry-pick':
+      case 'revert':
+        // --no-edit: no editor can open here. A conflict stops mid-operation and
+        // stays that way — the files land in the WIP row, the terminal finishes it.
+        await git(repo, [action, '--no-edit', sha])
+        break
+      case 'tag':
+        await git(repo, ['tag', await newRefName(repo, req.body.name, 'tag'), sha])
+        break
+      case 'reset': {
+        const mode = req.body.mode
+        if (mode !== 'soft' && mode !== 'mixed' && mode !== 'hard') throw httpError(400, 'invalid reset mode')
+        // --hard is the only action here that can destroy uncommitted work, so it
+        // doesn't: the worktree goes to a stash first and the reset is recoverable
+        if (mode === 'hard') await stashIfDirty(repo, `WIP before reset to ${short}`)
+        await git(repo, ['reset', `--${mode}`, sha])
         break
       }
       default:

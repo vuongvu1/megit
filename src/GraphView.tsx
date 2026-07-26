@@ -3,6 +3,7 @@ import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { branchMenu, type RefChip } from './branchMenu'
+import { commitMenu } from './commitMenu'
 import { layout, stashSlot, activeTrail, type LaneRow, type TrailRow } from './lanes'
 import type { Selection } from './RepoView'
 import { useAvatar, initials } from './avatar'
@@ -77,6 +78,14 @@ const CheckIcon = () => (
 )
 
 type Dash = { lane: number; end: boolean } // WIP/stash connector passing through (end: terminates at this row's dot)
+
+// The refs gutter is its own zone, not part of the row: chips answer for
+// themselves and blank space in it does nothing — same rule the click handler
+// on it already follows, so a right-click beside a chip can't open the row's menu.
+const inert = (e: ReactMouseEvent) => {
+  e.preventDefault()
+  e.stopPropagation()
+}
 
 // active-branch emphasis: trail segments thicker, everything else translucent;
 // plain stroke when there's no trail (HEAD not in the loaded commits)
@@ -159,7 +168,7 @@ const fmtDate = (unix: number) => {
   return new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 }
 
-function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onCheckout, onChipMenu }: {
+function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onCheckout, onChipMenu, onRowMenu }: {
   repo: string
   c: Commit
   row: LaneRow
@@ -171,14 +180,15 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   trail: TrailRow | null
   onCheckout: (branch: string) => void
   onChipMenu: (e: ReactMouseEvent, chip: RefChip, hash: string) => void
+  onRowMenu: (e: ReactMouseEvent, hash: string) => void
 }) {
   const isMerge = c.parents.length > 1
   const avatarUrl = useAvatar(repo, isMerge ? null : c.email)
   const chips = useMemo(() => parseRefs(c.refs, remotes), [c.refs, remotes])
   const isHead = chips.some(ch => ch.head)
   return (
-    <div className={`row${selected ? ' selected' : ''}`} onClick={onSelect}>
-      <span className="refs" onClick={e => e.stopPropagation()}>
+    <div className={`row${selected ? ' selected' : ''}`} onClick={onSelect} onContextMenu={e => onRowMenu(e, c.hash)}>
+      <span className="refs" onClick={e => e.stopPropagation()} onContextMenu={inert}>
         {chips.map(chip => {
           const canCheckout = !chip.head && !chip.tag && (chip.local || chip.remote)
           return (
@@ -188,7 +198,9 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
             style={{ borderColor: color(row.lane) }}
             title={canCheckout ? `${chip.name} — double-click to checkout, right-click for actions` : `${chip.name} — right-click for actions`}
             onDoubleClick={canCheckout ? () => onCheckout(chip.name) : undefined}
-            onContextMenu={e => onChipMenu(e, chip, c.hash)}
+            // a chip's menu replaces the row's — without this the row handler
+            // fires next and overwrites it with the commit menu
+            onContextMenu={e => { e.stopPropagation(); onChipMenu(e, chip, c.hash) }}
           >
             {chip.head && <CheckIcon />}
             <span className="ref-name">{chip.name}</span>
@@ -241,7 +253,7 @@ function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSele
   const solids = [...new Set([...passRow.incoming, ...passRow.through])]
   return (
     <div className={`row stash${selected ? ' selected' : ''}`} onClick={onSelect} onContextMenu={onMenu}>
-      <span className="refs" onClick={e => e.stopPropagation()} />
+      <span className="refs" onClick={e => e.stopPropagation()} onContextMenu={inert} />
       <span className="graph-col">
         <svg width={width} height={ROW} className="graph-cell">
           {solids.map(l => (
@@ -336,6 +348,44 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
       })
       .catch(err => alert(`Checkout failed:\n${(err as Error).message}`))) // ponytail: alert; inline toast if it grates
   }
+  const commitPost = (body: object) =>
+    api(`/api/commit?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
+  const commitApi = (body: object, label: string) =>
+    onBusy(commitPost(body).catch(err => alert(`${label} failed:\n${(err as Error).message}`)))
+  const newBranchAt = (hash: string) => {
+    const name = prompt(`New branch at ${hash.slice(0, 7)}`, '')
+    if (name) branchApi({ action: 'create', name, at: hash }, 'Create branch')
+  }
+  const rowItems = (hash: string): MenuItem[] => commitMenu({
+    isHead: hash === headHash,
+    current: headBranch,
+    canLink: !!githubUrl,
+    run: action => {
+      const short = hash.slice(0, 7)
+      switch (action) {
+        case 'checkout':
+          if (confirm(`Check out ${short} directly?\n\nHEAD detaches from ${headBranch ?? 'its branch'} — new commits would belong to no branch until you make one.`))
+            commitApi({ action: 'checkout', hash }, 'Checkout')
+          return
+        case 'cherry-pick': return void commitApi({ action: 'cherry-pick', hash }, 'Cherry-pick')
+        case 'revert': return void commitApi({ action: 'revert', hash }, 'Revert')
+        case 'branch': return newBranchAt(hash)
+        case 'tag': {
+          const name = prompt(`New tag at ${short}`, '')
+          if (name) commitApi({ action: 'tag', hash, name }, 'Create tag')
+          return
+        }
+        case 'reset-soft': return void commitApi({ action: 'reset', hash, mode: 'soft' }, 'Reset')
+        case 'reset-mixed': return void commitApi({ action: 'reset', hash, mode: 'mixed' }, 'Reset')
+        case 'reset-hard':
+          if (confirm(`Reset ${headBranch} to ${short} and discard changes?\n\nCommits after ${short} leave the branch (reflog keeps them). Uncommitted work goes to a stash first.`))
+            commitApi({ action: 'reset', hash, mode: 'hard' }, 'Reset')
+          return
+        case 'copySha': return void navigator.clipboard.writeText(hash)
+        case 'copyLink': return void navigator.clipboard.writeText(`${githubUrl}/commit/${hash}`)
+      }
+    },
+  })
   const chipItems = (chip: RefChip, hash: string): MenuItem[] => branchMenu(chip, {
     current: headBranch,
     hasRemote: remotes.length > 0,
@@ -352,11 +402,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
           if (upstream) branchApi({ action: 'upstream', branch: chip.name, upstream }, 'Set upstream')
           return
         }
-        case 'create': {
-          const name = prompt(`New branch at ${hash.slice(0, 7)}`, '')
-          if (name) branchApi({ action: 'create', name, at: hash }, 'Create branch')
-          return
-        }
+        case 'create': return newBranchAt(hash)
         case 'rename': {
           const name = prompt(`Rename ${chip.name} to`, chip.name)
           if (name && name !== chip.name) branchApi({ action: 'rename', branch: chip.name, name }, 'Rename')
@@ -440,7 +486,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
           onClick={() => onSelect(selection?.kind === 'wip' ? null : { kind: 'wip' })}
           onContextMenu={e => openMenu(e, wipItems())}
         >
-          <span className="refs" onClick={e => e.stopPropagation()} />
+          <span className="refs" onClick={e => e.stopPropagation()} onContextMenu={inert} />
           <span className="graph-col">
             <svg width={width} height={ROW} className="graph-cell">
               {/* stash connectors don't reach the WIP row — it sits above them */}
@@ -481,6 +527,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
               trail={trail ? trail[i] : null}
               onCheckout={checkout}
               onChipMenu={(e, chip, hash) => openMenu(e, chipItems(chip, hash))}
+              onRowMenu={(e, hash) => openMenu(e, rowItems(hash))}
             />
           </Fragment>
         )
