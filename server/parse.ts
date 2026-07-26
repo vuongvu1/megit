@@ -63,6 +63,13 @@ export function parseLog(raw: string): Commit[] {
     })
 }
 
+// `stash@{N}` is positional and renumbers on every stash push/drop, so a stash
+// action must map its sha to an index against a list read at action time — an
+// index captured when the graph loaded can address a different stash by now.
+// Exact match: a prefix could collide, and every caller has the full %H.
+export const stashIndex = (raw: string, hash: string) =>
+  raw.split('\n').filter(Boolean).indexOf(hash)
+
 export function parseStatus(raw: string): StatusEntry[] {
   const out: StatusEntry[] = []
   for (const line of raw.split('\n')) {

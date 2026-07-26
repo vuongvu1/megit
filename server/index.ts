@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
-import { parseLog, parseMeta, parseStatus, LOG_FORMAT, META_FORMAT } from './parse.ts'
+import { parseLog, parseMeta, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal } from './term.ts'
 
@@ -229,6 +229,41 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     await git(repo, ['checkout', '-B', branch, remoteRef])
     res.json({ ok: true, reset: true, stashed: dirty })
   } catch (e) {
+    res.status(409).json({ error: (e as Error).message })
+  }
+})
+
+app.post('/api/stash', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const hash = String(req.body.hash ?? '')
+  const action = req.body.action
+  if (action !== 'push' && (!isSha(hash) || (action !== 'pop' && action !== 'drop'))) {
+    res.status(400).json({ error: 'invalid stash request' })
+    return
+  }
+  try {
+    if (action === 'push') {
+      const message = String(req.body.message ?? '').trim()
+      // -u: the WIP row counts untracked files, so stashing without them would
+      // leave the row standing after a "stash everything" action.
+      // --message=<msg> (not -m <msg>): the value can't be mistaken for a flag.
+      await git(repo, ['stash', 'push', '-u', ...(message ? [`--message=${message}`] : [])])
+      res.json({ ok: true })
+      return
+    }
+    // the index is derived from git's own list here, never from the request, so
+    // no client string reaches argv and a concurrent drop can't misaddress this one
+    const idx = stashIndex(await git(repo, ['stash', 'list', '--format=%H']), hash)
+    if (idx < 0) {
+      res.status(409).json({ error: 'stash no longer exists — it was already popped or dropped' })
+      return
+    }
+    // ponytail: plain `pop`, no --index — restoring the staged/unstaged split fails
+    // outright when the index can't be reapplied. Add --index if that split matters.
+    await git(repo, ['stash', action, `stash@{${idx}}`])
+    res.json({ ok: true })
+  } catch (e) {
+    // conflicting pop leaves the stash in place and markers in the tree — git says so
     res.status(409).json({ error: (e as Error).message })
   }
 })

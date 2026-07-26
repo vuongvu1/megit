@@ -131,6 +131,13 @@ button:hover { background: var(--border); }
 .hash { color: var(--fg-faint); font-family: 'Ubuntu Mono', ui-monospace, monospace; font-size: 12px; }
 .load-more { margin: 8px; padding: 4px 14px; }
 
+/* context menu: popover default styling is a centered inset:0 box — reset to cursor-anchored */
+.ctx-menu { position: fixed; inset: auto; margin: 0; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-panel); box-shadow: 0 6px 20px rgba(0, 0, 0, .35); min-width: 150px; }
+.ctx-item { display: block; width: 100%; padding: 5px 10px; border: 0; border-radius: 4px; background: none; color: var(--fg); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.ctx-item:hover { background: var(--bg-hover); }
+.ctx-item.danger { color: #e06c75; }
+.ctx-item.danger:hover { background: #e06c75; color: #fff; }
+
 .panel { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 .commit-msg { padding: 10px 12px; border-bottom: 1px solid var(--border); max-height: 30%; overflow-y: auto; flex-shrink: 0; }

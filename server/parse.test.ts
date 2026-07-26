@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseLog, parseMeta, parseStatus } from './parse.ts'
+import { parseLog, parseMeta, parseStatus, stashIndex } from './parse.ts'
 
 const F = '\x1f'
 const R = '\x1e'
@@ -61,5 +61,17 @@ describe('parseStatus', () => {
 
   it('handles empty input', () => {
     expect(parseStatus('')).toEqual([])
+  })
+})
+
+describe('stashIndex', () => {
+  const raw = 'aaa\nbbb\nccc\n'
+  it('maps a sha to its stash@{N} position', () => {
+    expect(stashIndex(raw, 'aaa')).toBe(0)
+    expect(stashIndex(raw, 'ccc')).toBe(2)
+  })
+  it('returns -1 when the stash is gone', () => {
+    expect(stashIndex(raw, 'ddd')).toBe(-1)
+    expect(stashIndex('', 'aaa')).toBe(-1)
   })
 })

@@ -1,6 +1,7 @@
-import { Fragment, memo, useMemo } from 'react'
+import { Fragment, memo, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
+import ContextMenu, { type MenuItem } from './ContextMenu'
 import { layout, stashSlot, activeTrail, type LaneRow, type TrailRow } from './lanes'
 import type { Selection } from './RepoView'
 import { useAvatar, initials } from './avatar'
@@ -238,7 +239,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
 // stash node at its chronological row, drawn on a lane free of solid traffic
 // across its whole dotted span (GitKraken-style); lanes crossing the insertion
 // row's top edge (incoming ∪ through) continue solid through this row
-function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSelect }: {
+function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSelect, onMenu }: {
   s: StashEntry
   lane: number // display lane (where the square and connector sit)
   passRow: LaneRow // the commit row this stash was inserted above
@@ -247,13 +248,14 @@ function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSele
   trailLane: number | null // active-branch line crossing this row (null = no trail)
   selected: boolean
   onSelect: () => void
+  onMenu: (e: ReactMouseEvent) => void
 }) {
   const x = (l: number) => l * COL + COL / 2
   const sx = x(lane)
   const sc = color(lane)
   const solids = [...new Set([...passRow.incoming, ...passRow.through])]
   return (
-    <div className={`row stash${selected ? ' selected' : ''}`} onClick={onSelect}>
+    <div className={`row stash${selected ? ' selected' : ''}`} onClick={onSelect} onContextMenu={onMenu}>
       <span className="refs" onClick={e => e.stopPropagation()} />
       <span className="graph-col">
         <svg width={width} height={ROW} className="graph-cell">
@@ -295,6 +297,37 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   const headIdx = useMemo(() => commits.findIndex(c => c.refs.some(r => r === 'HEAD' || r.startsWith('HEAD -> '))), [commits])
   const headHash = headIdx >= 0 ? commits[headIdx].hash : undefined
   const showWip = status.length > 0
+  // items are built at open time, so the menu itself stays generic — commit and
+  // branch menus are a different array through the same openMenu
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
+  const openMenu = (e: ReactMouseEvent, items: MenuItem[]) => {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, items })
+  }
+  const stashApi = (body: object, label: string) =>
+    onBusy(api(`/api/stash?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
+      .catch(err => alert(`Stash ${label} failed:\n${(err as Error).message}`)))
+  // pop drops the stash too, but its content lands in the worktree where the user
+  // can see (and re-stash) it — delete is the one that leaves nothing behind, so
+  // it's the only one that confirms
+  const stashItems = (s: StashEntry): MenuItem[] => [
+    { label: 'Pop stash', onClick: () => stashApi({ hash: s.hash, action: 'pop' }, 'pop') },
+    {
+      label: 'Delete stash',
+      danger: true,
+      onClick: () => { if (confirm(`Delete this stash?\n\n${s.subject}`)) stashApi({ hash: s.hash, action: 'drop' }, 'delete') },
+    },
+  ]
+  const wipItems = (): MenuItem[] => [{
+    label: 'Stash changes',
+    onClick: () => {
+      const branch = commits[headIdx]?.refs.find(r => r.startsWith('HEAD -> '))?.slice(8)
+      // ponytail: native prompt as the naming dialog; nothing is lost on cancel
+      const message = prompt('Stash message', `WIP on ${branch ?? 'HEAD'}`)
+      if (message === null) return
+      stashApi({ action: 'push', message }, 'save')
+    },
+  }]
   // pin HEAD's branch to lane 0 and reserve one lane per dotted connector
   // anchored to it (WIP, then HEAD-based stashes) — each runs straight down
   // into the checked-out branch, GitKraken-style, instead of routing around
@@ -350,7 +383,11 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
   return (
     <div className="graphview">
       {showWip && (
-        <div className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`} onClick={() => onSelect(selection?.kind === 'wip' ? null : { kind: 'wip' })}>
+        <div
+          className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`}
+          onClick={() => onSelect(selection?.kind === 'wip' ? null : { kind: 'wip' })}
+          onContextMenu={e => openMenu(e, wipItems())}
+        >
           <span className="refs" onClick={e => e.stopPropagation()} />
           <span className="graph-col">
             <svg width={width} height={ROW} className="graph-cell">
@@ -377,6 +414,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
                 trailLane={trail ? (trail[i].through >= 0 ? trail[i].through : trail[i].incoming) : null}
                 selected={selection?.kind === 'commit' && selection.hash === p.s.hash}
                 onSelect={() => onSelect(selection?.kind === 'commit' && selection.hash === p.s.hash ? null : { kind: 'commit', hash: p.s.hash })}
+                onMenu={e => openMenu(e, stashItems(p.s))}
               />
             ))}
             <CommitRow
@@ -395,6 +433,7 @@ function GraphView({ repo, commits, status, remotes, stashes, selection, onSelec
         )
       })}
       {hasMore && <button className="load-more" onClick={onLoadMore}>Load more</button>}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 }
