@@ -158,13 +158,13 @@ function GraphCell({ row, width, avatarUrl, label, clipId, dashes, trail, toolti
   )
 }
 
-const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 const fmtDate = (unix: number) => {
   const secs = Math.floor(Date.now() / 1000) - unix
   if (secs >= 0 && secs < 7 * 86400) {
-    if (secs < 3600) return rtf.format(-Math.floor(secs / 60), 'minute')
-    if (secs < 86400) return rtf.format(-Math.floor(secs / 3600), 'hour')
-    return rtf.format(-Math.floor(secs / 86400), 'day')
+    if (secs < 60) return 'now'
+    if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
+    if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
+    return `${Math.floor(secs / 86400)}d ago`
   }
   return new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 }
