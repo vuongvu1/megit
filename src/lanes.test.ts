@@ -64,6 +64,18 @@ describe('layout with a reserved lane', () => {
     expect(freeLane(rows, 0, 2, [])).toBe(0)
   })
 
+  it('merges into the reserved commit from the row above without a detour lane', () => {
+    // 'm' sits directly above HEAD 'c' and has it as a second parent: nothing
+    // runs between the two dots, so the link is a curve into HEAD's dot — not a
+    // lane of its own, which bulged out to an empty column and straight back
+    const { rows, maxLanes } = layout([c('m', 'b', 'c'), c('c', 'a'), c('b', 'a'), c('a')], 'c')
+    expect(rows.map(r => r.lane)).toEqual([1, 0, 1, 0])
+    expect(rows[0].outgoing).toEqual([1]) // first parent only — no extra lane
+    expect(rows[1].incoming).toEqual([1]) // curves into HEAD from 'm's lane
+    expect(maxLanes).toBe(2)
+    expect(freeLane(rows, 0, 1, [])).toBe(0) // dotted connector still runs straight down
+  })
+
   it('ignores a reservation for a commit not in the list', () => {
     expect(layout([c('b', 'a'), c('a')], 'zzz')).toEqual(layout([c('b', 'a'), c('a')]))
   })

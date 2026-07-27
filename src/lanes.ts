@@ -18,7 +18,12 @@ export function layout(commits: { hash: string; parents: string[] }[], reserve?:
   let seeded = reserve !== undefined && nRes > 0 && commits.some(c => c.hash === reserve)
   if (seeded) for (let i = 0; i < nRes; i++) expect[i] = reserve!
   let maxLanes = 0
-  const rows = commits.map(c => {
+  // Merge links into the reserved commit from the row right above it: no row
+  // runs between the two dots, so they're handed down as an extra incoming
+  // curve into that dot instead of claiming a lane — which, with the reserved
+  // lanes skipped, meant detouring out to an empty column and straight back.
+  let mergeIn: number[] = []
+  const rows = commits.map((c, row) => {
     const hit = seeded && c.hash === reserve
     if (hit) seeded = false
     const incoming: number[] = []
@@ -37,6 +42,10 @@ export function layout(commits: { hash: string; parents: string[] }[], reserve?:
       expect[lane] = c.parents[0]
       outgoing.push(lane)
       for (const p of c.parents.slice(1)) {
+        if (seeded && p === reserve && commits[row + 1]?.hash === reserve) {
+          mergeIn.push(lane)
+          continue
+        }
         let t = expect.indexOf(p, seeded ? nRes : 0)
         if (t === -1) {
           t = expect.indexOf(null, seeded ? nRes : 0)
@@ -49,6 +58,11 @@ export function layout(commits: { hash: string; parents: string[] }[], reserve?:
       expect[lane] = null
     }
 
+    // after the expect bookkeeping above: these lanes keep their own lines
+    if (hit && mergeIn.length) {
+      incoming.push(...mergeIn)
+      mergeIn = []
+    }
     maxLanes = Math.max(maxLanes, expect.length, lane + 1)
     while (expect.length && expect[expect.length - 1] === null) expect.pop()
     return { lane, incoming, outgoing, through }
