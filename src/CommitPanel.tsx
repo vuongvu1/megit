@@ -13,17 +13,24 @@ const fmtWhen = (unix: number) =>
   new Date(unix * 1000).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 const PencilIcon = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11.4 1.9l2.7 2.7-8.5 8.5-3.3.6.6-3.3z" />
     <path d="M9.5 3.8l2.7 2.7" />
   </svg>
 )
 
-const TrashIcon = () => (
-  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.5h6.6L12 4M6.5 6.5v5M9.5 6.5v5" />
+const icon = (d: string, size = 15) => () => (
+  <svg viewBox="0 0 16 16" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    {d.split('|').map(p => <path key={p} d={p} />)}
   </svg>
 )
+
+const PlusIcon = icon('M8 3.5v9|M3.5 8h9')
+const MinusIcon = icon('M3.5 8h9')
+const TrashIcon = icon('M2.5 4h11|M6.5 4V2.5h3V4|M4 4l.7 9.5h6.6L12 4|M6.5 6.5v5|M9.5 6.5v5')
+// the inbox tray the stash rows draw in the graph, redrawn to fill the viewBox —
+// the graph's version is centred in a 20px node and reads small next to +/trash
+const StashIcon = icon('M2.5 8.5v4h11v-4|M2.5 8.5h3l1.2 1.7h2.6l1.2-1.7h3|M4.8 6.6L8 3.4l3.2 3.2')
 
 function Face({ repo, name, email }: { repo: string; name: string; email: string }) {
   const url = useAvatar(repo, email)
@@ -44,28 +51,31 @@ function Person({ repo, name, email, verb, date }: { repo: string; name: string;
   )
 }
 
-type RowAction = { label: string; title: string; run: (path: string) => void }
+type RowAction = { Icon: () => React.ReactElement; title: string; danger?: boolean; run: (path: string, status: string) => void }
 
-function FileRow({ path, name, dir, status, depth, selected, onClick, action }: { path: string; name: string; dir?: string; status: string; depth: number; selected: boolean; onClick: () => void; action?: RowAction }) {
+function FileRow({ path, name, dir, status, depth, selected, onClick, actions }: { path: string; name: string; dir?: string; status: string; depth: number; selected: boolean; onClick: () => void; actions?: RowAction[] }) {
   return (
     <div className={`file-row${selected ? ' selected' : ''}`} style={{ paddingLeft: 8 + depth * 14 }} onClick={onClick} title={path}>
       <span className="file-status" style={{ color: STATUS_COLOR[status] ?? 'var(--fg)' }}>{status}</span>
       <span className="file-path">{dir && <span className="file-dir">{dir}</span>}{name}</span>
-      {action && (
-        <button className="row-action" title={action.title} onClick={e => { e.stopPropagation(); action.run(path) }}>{action.label}</button>
-      )}
+      {actions?.map(a => (
+        <button key={a.title} className={`row-action${a.danger ? ' danger' : ''}`} title={a.title} aria-label={a.title}
+          onClick={e => { e.stopPropagation(); a.run(path, status) }}>
+          <a.Icon />
+        </button>
+      ))}
     </div>
   )
 }
 
-function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect, action }: {
+function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect, actions }: {
   nodes: TreeNode[]
   depth: number
   collapsed: Set<string>
   onToggle: (path: string) => void
   file: string | null
   onFileSelect: (file: string) => void
-  action?: RowAction
+  actions?: RowAction[]
 }) {
   return (
     <>
@@ -77,11 +87,11 @@ function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect, action }:
               <span className="file-dir">{n.name}</span>
             </div>
             {!collapsed.has(n.path) && (
-              <Tree nodes={n.children} depth={depth + 1} collapsed={collapsed} onToggle={onToggle} file={file} onFileSelect={onFileSelect} action={action} />
+              <Tree nodes={n.children} depth={depth + 1} collapsed={collapsed} onToggle={onToggle} file={file} onFileSelect={onFileSelect} actions={actions} />
             )}
           </div>
         ) : (
-          <FileRow key={n.path} path={n.path} name={n.name} status={n.status!} depth={depth} selected={file === n.path} onClick={() => onFileSelect(n.path)} action={action} />
+          <FileRow key={n.path} path={n.path} name={n.name} status={n.status!} depth={depth} selected={file === n.path} onClick={() => onFileSelect(n.path)} actions={actions} />
         ),
       )}
     </>
@@ -90,10 +100,10 @@ function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect, action }:
 
 // one WIP section; same rows as the commit view, plus a stage/unstage button and
 // a side so a partially staged file highlights only in the half you clicked
-function FileList({ files, side, action, view, collapsed, onToggle, file, fileSide, onFileSelect, empty }: {
+function FileList({ files, side, actions, view, collapsed, onToggle, file, fileSide, onFileSelect, empty }: {
   files: StatusEntry[]
   side: DiffSide
-  action: RowAction
+  actions: RowAction[]
   view: 'path' | 'tree'
   collapsed: Set<string>
   onToggle: (path: string) => void
@@ -107,18 +117,18 @@ function FileList({ files, side, action, view, collapsed, onToggle, file, fileSi
   const select = (path: string) => onFileSelect(path, side)
   if (!files.length) return <div className="empty">{empty}</div>
   return view === 'tree' ? (
-    <Tree nodes={tree} depth={0} collapsed={collapsed} onToggle={onToggle} file={selected} onFileSelect={select} action={action} />
+    <Tree nodes={tree} depth={0} collapsed={collapsed} onToggle={onToggle} file={selected} onFileSelect={select} actions={actions} />
   ) : (
     <>
       {files.map(f => {
         const cut = f.path.lastIndexOf('/') + 1
-        return <FileRow key={f.path} path={f.path} name={f.path.slice(cut)} dir={cut ? f.path.slice(0, cut) : undefined} status={f.status} depth={0} selected={selected === f.path} onClick={() => select(f.path)} action={action} />
+        return <FileRow key={f.path} path={f.path} name={f.path.slice(cut)} dir={cut ? f.path.slice(0, cut) : undefined} status={f.status} depth={0} selected={selected === f.path} onClick={() => select(f.path)} actions={actions} />
       })}
     </>
   )
 }
 
-export default function CommitPanel({ repo, selection, status, file, fileSide, onFileSelect, canAmend, onCommitted, onChanged }: {
+export default function CommitPanel({ repo, selection, status, file, fileSide, onFileSelect, canAmend, isStash, branch, onCommitted, onChanged }: {
   repo: string
   selection: Selection
   status: StatusEntry[]
@@ -126,6 +136,8 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
   fileSide?: DiffSide
   onFileSelect: (file: string, side?: DiffSide) => void
   canAmend: boolean // selection is the tip of the checked-out branch
+  isStash: boolean // selection is a stash commit — its message is editable too
+  branch: string | null // checked-out branch, for default stash messages
   onCommitted: (hash: string) => void
   onChanged: () => void // staged/discarded — refetch, selection stays put
 }) {
@@ -194,9 +206,23 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
   }
   const stage = (path: string) => wipPost({ action: 'stage', path }, 'Stage', onChanged)
   const unstage = (path: string) => wipPost({ action: 'unstage', path }, 'Unstage', onChanged)
+  const stageAll = () => wipPost({ action: 'stage-all' }, 'Stage all', onChanged)
+  const unstageAll = () => wipPost({ action: 'unstage-all' }, 'Unstage all', onChanged)
+  const discardFile = (path: string, status: string) => {
+    // untracked has no index copy to restore from, so discarding it is a delete —
+    // the wording has to say which one is about to happen
+    const what = status === '?'
+      ? `Delete untracked file ${path}?`
+      : `Discard changes to ${path}?\n\nThe file goes back to its staged content.`
+    if (confirm(`${what}\n\nThis cannot be undone.`)) wipPost({ action: 'discard-file', path }, 'Discard', onChanged)
+  }
   const discardAll = () => {
-    if (!confirm(`Discard all ${files.length} uncommitted change${files.length > 1 ? 's' : ''}?\n\nStaged and unstaged edits go back to HEAD and untracked files are deleted. This cannot be undone — "Stash changes" on the row keeps them instead.`)) return
+    if (!confirm(`Discard all ${files.length} uncommitted change${files.length > 1 ? 's' : ''}?\n\nStaged and unstaged edits go back to HEAD and untracked files are deleted. This cannot be undone — stash them instead to keep them.`)) return
     wipPost({ action: 'discard' }, 'Discard', onChanged)
+  }
+  const stashScope = (scope: 'staged' | 'unstaged') => {
+    const message = prompt(`Stash ${scope} changes as`, `${scope === 'staged' ? 'Staged' : 'Unstaged'} changes on ${branch ?? 'HEAD'}`)
+    if (message !== null) wipPost({ action: 'stash', scope, message }, 'Stash', onChanged)
   }
   const commit = () =>
     wipPost({ action: 'commit', message: msg.trim() }, 'Commit', r => {
@@ -209,6 +235,16 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
     const message = (draft ?? '').trim()
     if (!message || message === (meta?.message ?? '').trim()) {
       setDraft(null)
+      return
+    }
+    if (isStash) {
+      // a stash is unreachable from any remote, so there's nothing to force past
+      setSaving(true)
+      setError('')
+      api<{ hash: string }>(`/api/stash?repo=${encodeURIComponent(repo)}`, jsonInit('POST', { action: 'retitle', hash: selection.hash, message }))
+        .then(r => { setDraft(null); onCommitted(r.hash) })
+        .catch((err: Error) => setError(`Edit message failed: ${err.message}`))
+        .finally(() => setSaving(false))
       return
     }
     const post = (force: boolean) =>
@@ -236,13 +272,15 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
           <div className="commit-msg">
             {draft === null ? (
               <>
-                <div className="commit-subject">{subject}</div>
+                <div className="commit-subject">
+                  {subject}
+                  {(canAmend || isStash) && (
+                    <button className="msg-edit" title={isStash ? 'Edit stash message' : 'Edit message (amends this commit)'} aria-label="Edit message" onClick={() => setDraft(meta.message)}>
+                      <PencilIcon />
+                    </button>
+                  )}
+                </div>
                 {bodyText && <div className="commit-body">{bodyText}</div>}
-                {canAmend && (
-                  <button className="msg-edit" title="Edit message (amends this commit)" aria-label="Edit message" onClick={() => setDraft(meta.message)}>
-                    <PencilIcon />
-                  </button>
-                )}
               </>
             ) : (
               <>
@@ -282,22 +320,40 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
           <button className={view === 'path' ? 'active' : ''} onClick={() => setViewPersist('path')}>Path</button>
           <button className={view === 'tree' ? 'active' : ''} onClick={() => setViewPersist('tree')}>Tree</button>
         </span>
-        {isWip && files.length > 0 && (
-          <button className="wip-discard" title="Discard all changes" aria-label="Discard all changes" onClick={discardAll} disabled={busy}>
-            <TrashIcon />
-          </button>
-        )}
       </div>
       {isWip ? (
         <>
           {/* unstaged first, staged last — the staged set sits right above the
               composer, in the order the work actually flows */}
           <div className="filelist">
-            <div className="section-head">Changes <b>{sides.unstaged.length}</b></div>
-            <FileList files={sides.unstaged} side="worktree" action={{ label: '+', title: 'Stage', run: stage }}
+            <div className="section-head">
+              Changes <b>{sides.unstaged.length}</b>
+              {/* stage/unstage last: it's the one you reach for repeatedly, so it sits
+                  in the same spot as the per-row +/− directly below */}
+              {sides.unstaged.length > 0 && (
+                <span className="head-actions">
+                  <button title="Stash unstaged changes" aria-label="Stash unstaged changes" onClick={() => stashScope('unstaged')} disabled={busy}><StashIcon /></button>
+                  <button className="danger" title="Discard all changes" aria-label="Discard all changes" onClick={discardAll} disabled={busy}><TrashIcon /></button>
+                  <button title="Stage all changes" aria-label="Stage all changes" onClick={stageAll} disabled={busy}><PlusIcon /></button>
+                </span>
+              )}
+            </div>
+            <FileList files={sides.unstaged} side="worktree"
+              actions={[
+                { Icon: TrashIcon, title: 'Discard changes', danger: true, run: discardFile },
+                { Icon: PlusIcon, title: 'Stage', run: stage },
+              ]}
               view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing to stage" />
-            <div className="section-head">Staged Changes <b>{sides.staged.length}</b></div>
-            <FileList files={sides.staged} side="staged" action={{ label: '−', title: 'Unstage', run: unstage }}
+            <div className="section-head">
+              Staged Changes <b>{sides.staged.length}</b>
+              {sides.staged.length > 0 && (
+                <span className="head-actions">
+                  <button title="Stash staged changes" aria-label="Stash staged changes" onClick={() => stashScope('staged')} disabled={busy}><StashIcon /></button>
+                  <button title="Unstage all changes" aria-label="Unstage all changes" onClick={unstageAll} disabled={busy}><MinusIcon /></button>
+                </span>
+              )}
+            </div>
+            <FileList files={sides.staged} side="staged" actions={[{ Icon: MinusIcon, title: 'Unstage', run: unstage }]}
               view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing staged" />
           </div>
           <div className="composer">

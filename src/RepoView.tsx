@@ -72,9 +72,12 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         setRemotes(gRes.remotes)
         setStashes(gRes.stashes ?? [])
         setGithubUrl(gRes.githubUrl ?? null)
-        // commit rewritten away (rebase/amend) → back to initial-load selection
+        // commit rewritten away (rebase/amend) → back to initial-load selection.
+        // stashes count as selectable rows, so a selected stash isn't "gone".
         setSelection(sel =>
-          sel?.kind === 'commit' && !gRes.commits.some(c => c.hash === sel.hash) ? null : sel)
+          sel?.kind === 'commit'
+            && !gRes.commits.some(c => c.hash === sel.hash)
+            && !(gRes.stashes ?? []).some(s => s.hash === sel.hash) ? null : sel)
       }
       const sf = statusFp(s.files)
       if (fps.current.status !== sf) {
@@ -266,6 +269,8 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
               fileSide={file?.side}
               onFileSelect={(path, side) => setFile({ path, side })}
               canAmend={selection?.kind === 'commit' && selection.hash === headCommit?.hash}
+              isStash={selection?.kind === 'commit' && stashes.some(s => s.hash === selection.hash)}
+              branch={headCommit?.refs.find(r => r.startsWith('HEAD -> '))?.slice(8) ?? null}
               // amend rewrites the sha and commit makes a new one: either way follow the
               // selection there, or the refresh drops it as a commit that no longer exists
               onCommitted={hash => { setSelection({ kind: 'commit', hash }); refresh() }}
