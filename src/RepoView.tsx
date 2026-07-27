@@ -54,6 +54,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [error, setError] = useState<{ msg: string; gone: boolean } | null>(null)
   const [wipTick, setWipTick] = useState(0)
   const [spinning, setSpinning] = useState(false)
+  const [busy, setBusy] = useState(false)
   const inflight = useRef(false)
   const [termOpen, setTermOpen] = useState(() => termOpenByRepo.get(repo) ?? false)
   const toggleTerm = useCallback(() => setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o }), [repo])
@@ -81,7 +82,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
     const g = ++gen.current
     const probe = !full && loaded.current > PAGE
     const limit = probe ? PAGE : Math.max(loaded.current, PAGE)
-    Promise.all([
+    return Promise.all([
       api<{ commits: Commit[]; hasMore: boolean; remotes: string[]; stashes: StashEntry[]; githubUrl: string | null }>(`/api/graph?${q}&limit=${limit}`),
       api<{ files: StatusEntry[]; branch: BranchHeader }>(`/api/status?${q}`),
     ]).then(([gRes, s]) => {
@@ -133,10 +134,14 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
 
   // spin the toolbar refresh icon while an arbitrary async action (e.g. checkout) runs,
   // then refetch immediately — beats the fs.watch → SSE → 400ms-debounce round-trip
+  // ...and blur the graph for the same window: the rows on screen are stale from the
+  // moment the mutation starts until the refetch lands, so they're not clickable either
   const spinWhile = useCallback((p: Promise<unknown>) => {
     inflight.current = true
     setSpinning(true)
-    p.finally(() => refresh())
+    setBusy(true)
+    // finally waits on a thenable the callback returns, so this clears once refresh settles
+    p.finally(() => refresh()).finally(() => setBusy(false))
   }, [refresh])
 
   // selection identity only changes on a real selection change (refresh returns
@@ -280,7 +285,7 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         </div>
       </div>
       <div className="panes" style={{ '--graph-w': selection ? `${graphPct}%` : '100%' } as CSSProperties}>
-        <div className="graph-pane" style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
+        <div className={busy ? 'graph-pane busy' : 'graph-pane'} style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
           <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} githubUrl={githubUrl} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} />
           <div className="col-splitter" style={{ left: refsW + 9 }} onPointerDown={onSplitDown} onPointerMove={onRefsMove} />
           <div className="col-splitter" style={{ left: refsW + graphColW + 17 }} onPointerDown={onSplitDown} onPointerMove={onGraphColMove} />
