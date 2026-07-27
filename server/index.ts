@@ -40,9 +40,9 @@ const GIT_ENV = {
   GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
 }
 
-function git(repo: string, args: string[], okCodes: number[] = [0], timeout = 0): Promise<string> {
+function git(repo: string, args: string[], okCodes: number[] = [0], timeout = 0, env?: Record<string, string>): Promise<string> {
   return new Promise((res, rej) => {
-    execFile('git', ['-C', repo, ...args], { maxBuffer: 50 * 1024 * 1024, env: GIT_ENV, timeout }, (err, stdout, stderr) => {
+    execFile('git', ['-C', repo, ...args], { maxBuffer: 50 * 1024 * 1024, env: { ...GIT_ENV, ...env }, timeout }, (err, stdout, stderr) => {
       if (err && (err as { killed?: boolean }).killed) {
         rej(new Error(`git ${args[0]} timed out after ${timeout / 1000}s`))
       } else if (err && !okCodes.includes(typeof err.code === 'number' ? err.code : 1)) {
@@ -254,7 +254,7 @@ app.post('/api/stash', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const hash = String(req.body.hash ?? '')
   const action = req.body.action
-  if (action !== 'push' && (!isSha(hash) || (action !== 'pop' && action !== 'drop'))) {
+  if (action !== 'push' && (!isSha(hash) || !['pop', 'drop', 'retitle'].includes(action))) {
     res.status(400).json({ error: 'invalid stash request' })
     return
   }
@@ -273,6 +273,30 @@ app.post('/api/stash', repoGuard, async (req, res) => {
     const idx = stashIndex(await git(repo, ['stash', 'list', '--format=%H']), hash)
     if (idx < 0) {
       res.status(409).json({ error: 'stash no longer exists — it was already popped or dropped' })
+      return
+    }
+    if (action === 'retitle') {
+      const message = String(req.body.message ?? '').trim()
+      if (!message) {
+        res.status(400).json({ error: 'empty stash message' })
+        return
+      }
+      // A stash's label is its own commit message, so editing it means rewriting the
+      // commit — same tree, same parents (3 when untracked files went in), same
+      // author/committer identity and dates, so the row keeps its place in the graph.
+      const [tree, parents, an, ae, ad, cn, ce, cd] =
+        (await git(repo, ['show', '-s', '--format=%T%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%cn%x1f%ce%x1f%cI', hash])).trim().split('\x1f')
+      const rewritten = (await git(repo, ['commit-tree', tree, ...parents.split(' ').flatMap(p => ['-p', p]), '-m', message], [0], 0, {
+        GIT_AUTHOR_NAME: an, GIT_AUTHOR_EMAIL: ae, GIT_AUTHOR_DATE: ad,
+        GIT_COMMITTER_NAME: cn, GIT_COMMITTER_EMAIL: ce, GIT_COMMITTER_DATE: cd,
+      })).trim()
+      // store lands at stash@{0} and pushes the rest down one, so the original is at
+      // idx + 1 (it can't be found by sha — both entries carry the old one's sha until
+      // the drop). ponytail: the edited stash keeps its new place at the top of
+      // `git stash list`; the graph orders stashes by date, so nothing moves there.
+      await git(repo, ['stash', 'store', `--message=${message}`, rewritten])
+      await git(repo, ['stash', 'drop', `stash@{${idx + 1}}`])
+      res.json({ ok: true, hash: rewritten })
       return
     }
     // ponytail: plain `pop`, no --index — restoring the staged/unstaged split fails
@@ -464,22 +488,53 @@ app.post('/api/wip', repoGuard, async (req, res) => {
     const mustBeDirty = async () => {
       const path = String(req.body.path ?? '')
       const dirty = parseStatus(await git(repo, ['status', '--porcelain=v2', '-uall']))
-      if (!dirty.some(f => f.path === path)) throw httpError(400, `no uncommitted change at: ${path}`)
-      return path
+      const entry = dirty.find(f => f.path === path)
+      if (!entry) throw httpError(400, `no uncommitted change at: ${path}`)
+      return entry
     }
     switch (action) {
       case 'stage':
-        await git(repo, ['add', '--', await mustBeDirty()])
+        await git(repo, ['add', '--', (await mustBeDirty()).path])
         break
       case 'unstage':
-        await git(repo, ['restore', '--staged', '--', await mustBeDirty()])
+        await git(repo, ['restore', '--staged', '--', (await mustBeDirty()).path])
         break
+      case 'stage-all':
+        await git(repo, ['add', '-A'])
+        break
+      case 'unstage-all':
+        await git(repo, ['restore', '--staged', '--', '.'])
+        break
+      case 'discard-file': {
+        const entry = await mustBeDirty()
+        // an untracked file has nothing to restore from — discarding it means deleting it.
+        // Tracked: restore the worktree from the index, so a staged part survives.
+        if (entry.y === '?') await git(repo, ['clean', '-f', '--', entry.path])
+        else await git(repo, ['restore', '--', entry.path])
+        break
+      }
       case 'discard':
         // everything back to HEAD: tracked files restored on both sides, untracked
         // removed. No -x — ignored files (node_modules, .env) are not "changes".
         await git(repo, ['restore', '--staged', '--worktree', '--', '.'])
         await git(repo, ['clean', '-fd'])
         break
+      case 'stash': {
+        const message = String(req.body.message ?? '').trim()
+        const msg = message ? [`--message=${message}`] : []
+        if (req.body.scope === 'staged') {
+          // --staged stashes exactly the index and leaves the worktree edits alone
+          await git(repo, ['stash', 'push', '--staged', ...msg])
+        } else if (req.body.scope === 'unstaged') {
+          // ponytail: --keep-index leaves the staged set in place, which is what the
+          // button promises — but the stash it writes holds the whole worktree, staged
+          // content included. Exact split would be push --staged, push -u, pop --index
+          // stash@{1}; three commands with a half-failed middle state. Upgrade if the
+          // superset ever bites when popping.
+          await git(repo, ['stash', 'push', '-u', '--keep-index', ...msg])
+        } else throw httpError(400, 'invalid stash scope')
+        break
+      }
       case 'commit': {
         const message = String(req.body.message ?? '').trim()
         if (!message) throw httpError(400, 'empty commit message')
