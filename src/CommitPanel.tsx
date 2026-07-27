@@ -59,7 +59,7 @@ function FileRow({ path, name, dir, status, depth, selected, onClick, actions }:
   return (
     <div className={`file-row${selected ? ' selected' : ''}`} style={{ paddingLeft: 8 + depth * 14 }} onClick={onClick} title={path}>
       <span className="file-status" style={{ color: STATUS_COLOR[status] ?? 'var(--fg)' }}>{status}</span>
-      <span className="file-path">{dir && <span className="file-dir">{dir}</span>}{name}</span>
+      <span className="file-path">{dir && <span className="file-dir">{dir}</span>}<span className="file-name">{name}</span></span>
       {actions?.map(a => (
         <button key={a.title} className={`row-action${a.danger ? ' danger' : ''}`} title={a.title} aria-label={a.title}
           onClick={e => { e.stopPropagation(); a.run(path, status) }}>
