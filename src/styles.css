@@ -165,9 +165,16 @@ button:hover { background: var(--border); }
 .head-actions button:disabled, .row-action:disabled { opacity: .4; }
 /* no rules on the section heads — the label's weight and the space above it do the
    separating; the only lines left in the panel are under the header and above the composer */
-.section-head { display: flex; align-items: center; gap: 5px; position: sticky; top: 0; z-index: 1; padding: 8px 6px 4px 8px; background: var(--bg-panel); color: var(--fg); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-.section-head b { color: var(--fg-dim); font-weight: 600; }
-.section-head .head-actions { margin-left: auto; }
+.section-head { display: flex; align-items: center; gap: 5px; position: sticky; top: 0; z-index: 1; padding: 8px 6px 5px 6px; background: var(--bg-panel); color: var(--fg); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; user-select: none; }
+.section-head:hover { background: var(--bg-hover); }
+.section-head .caret { display: flex; line-height: 0; color: var(--fg-dim); transition: transform .1s; }
+.section-head .caret.open { transform: rotate(90deg); }
+/* solid badge; grey when the section is empty */
+.section-head .count { display: inline-flex; align-items: center; justify-content: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; background: var(--bg-selected); color: var(--fg); font-size: 11px; letter-spacing: 0; }
+.section-head .count.zero { background: var(--bg-hover); color: var(--fg-faint); }
+/* actions stay out of sight until the header is pointed at or tabbed into */
+.section-head .head-actions { margin-left: auto; visibility: hidden; }
+.section-head:hover .head-actions, .section-head .head-actions:focus-within { visibility: visible; }
 /* mirrors .commit-msg: top of the panel, divider below, never squeezed by the list */
 .composer { padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .composer .msg-box { min-height: 56px; }

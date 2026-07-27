@@ -28,6 +28,8 @@ const icon = (d: string, size = 15) => () => (
 const PlusIcon = icon('M8 3.5v9|M3.5 8h9')
 const MinusIcon = icon('M3.5 8h9')
 const TrashIcon = icon('M2.5 4h11|M6.5 4V2.5h3V4|M4 4l.7 9.5h6.6L12 4|M6.5 6.5v5|M9.5 6.5v5')
+// points right; CSS rotates it a quarter turn when the section is open
+const ChevronIcon = icon('M5.5 2.5L11 8l-5.5 5.5')
 // the inbox tray the stash rows draw in the graph, redrawn to fill the viewBox —
 // the graph's version is centred in a 20px node and reads small next to +/trash
 const StashIcon = icon('M2.5 8.5v4h11v-4|M2.5 8.5h3l1.2 1.7h2.6l1.2-1.7h3|M4.8 6.6L8 3.4l3.2 3.2')
@@ -98,6 +100,27 @@ function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect, actions }
   )
 }
 
+// accordion header: the whole strip toggles, so the action buttons inside have to
+// keep their clicks to themselves. Empty sections still get a header — the count
+// badge going grey is how you see there's nothing there.
+function SectionHead({ label, count, shut, onToggle, children }: {
+  label: string
+  count: number
+  shut: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="section-head" onClick={onToggle} role="button" aria-expanded={!shut} tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}>
+      <span className={`caret${shut ? '' : ' open'}`}><ChevronIcon /></span>
+      {label}
+      <span className={`count${count ? '' : ' zero'}`}>{count}</span>
+      {count > 0 && <span className="head-actions" onClick={e => e.stopPropagation()}>{children}</span>}
+    </div>
+  )
+}
+
 // one WIP section; same rows as the commit view, plus a stage/unstage button and
 // a side so a partially staged file highlights only in the half you clicked
 function FileList({ files, side, actions, view, collapsed, onToggle, file, fileSide, onFileSelect, empty }: {
@@ -152,6 +175,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
   // refetch mid-typing can't wipe what's in the composer
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [shut, setShut] = useState({ staged: false, unstaged: false })
 
   useEffect(() => {
     setError('')
@@ -325,7 +349,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
             }}
           />
           <div className="msg-actions">
-            <span className="msg-hint">{sides.staged.length ? '⌘↵ to commit' : 'stage something to commit'}</span>
+            <span className="msg-hint">{sides.staged.length ? '⌘↵ to commit' : ''}</span>
             <button className="primary" onClick={commit} disabled={busy || !msg.trim() || !sides.staged.length}>
               Commit{sides.staged.length ? ` ${sides.staged.length}` : ''}
             </button>
@@ -344,37 +368,32 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
         </span>
       </div>
       {isWip ? (
-        // unstaged on top, staged below: the order work moves through
+        // staged on top, nearest the composer it feeds
         <div className="filelist">
-            <div className="section-head">
-              Changes <b>{sides.unstaged.length}</b>
-              {/* stage/unstage last: it's the one you reach for repeatedly, so it sits
-                  in the same spot as the per-row +/− directly below */}
-              {sides.unstaged.length > 0 && (
-                <span className="head-actions">
-                  <button title="Stash unstaged changes" aria-label="Stash unstaged changes" onClick={() => stashScope('unstaged')} disabled={busy}><StashIcon /></button>
-                  <button className="danger" title="Discard all changes" aria-label="Discard all changes" onClick={discardAll} disabled={busy}><TrashIcon /></button>
-                  <button title="Stage all changes" aria-label="Stage all changes" onClick={stageAll} disabled={busy}><PlusIcon /></button>
-                </span>
-              )}
-            </div>
+          <SectionHead label="Staged Changes" count={sides.staged.length} shut={shut.staged}
+            onToggle={() => setShut(s => ({ ...s, staged: !s.staged }))}>
+            <button title="Stash staged changes" aria-label="Stash staged changes" onClick={() => stashScope('staged')} disabled={busy}><StashIcon /></button>
+            <button title="Unstage all changes" aria-label="Unstage all changes" onClick={unstageAll} disabled={busy}><MinusIcon /></button>
+          </SectionHead>
+          {!shut.staged && (
+            <FileList files={sides.staged} side="staged" actions={[{ Icon: MinusIcon, title: 'Unstage', run: unstage }]}
+              view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing staged" />
+          )}
+          {/* stage/unstage last among the icons: same spot as the per-row +/− below it */}
+          <SectionHead label="Changes" count={sides.unstaged.length} shut={shut.unstaged}
+            onToggle={() => setShut(s => ({ ...s, unstaged: !s.unstaged }))}>
+            <button title="Stash unstaged changes" aria-label="Stash unstaged changes" onClick={() => stashScope('unstaged')} disabled={busy}><StashIcon /></button>
+            <button className="danger" title="Discard all changes" aria-label="Discard all changes" onClick={discardAll} disabled={busy}><TrashIcon /></button>
+            <button title="Stage all changes" aria-label="Stage all changes" onClick={stageAll} disabled={busy}><PlusIcon /></button>
+          </SectionHead>
+          {!shut.unstaged && (
             <FileList files={sides.unstaged} side="worktree"
               actions={[
                 { Icon: TrashIcon, title: 'Discard changes', danger: true, run: discardFile },
                 { Icon: PlusIcon, title: 'Stage', run: stage },
               ]}
               view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing to stage" />
-            <div className="section-head">
-              Staged Changes <b>{sides.staged.length}</b>
-              {sides.staged.length > 0 && (
-                <span className="head-actions">
-                  <button title="Stash staged changes" aria-label="Stash staged changes" onClick={() => stashScope('staged')} disabled={busy}><StashIcon /></button>
-                  <button title="Unstage all changes" aria-label="Unstage all changes" onClick={unstageAll} disabled={busy}><MinusIcon /></button>
-                </span>
-              )}
-            </div>
-            <FileList files={sides.staged} side="staged" actions={[{ Icon: MinusIcon, title: 'Unstage', run: unstage }]}
-              view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing staged" />
+          )}
         </div>
       ) : (
         <div className="filelist">
