@@ -64,15 +64,26 @@ button:hover { background: var(--border); }
 .repoview { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); animation: appear 0.5s ease-out; }
 @keyframes appear { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .repoview { animation: none; } }
-.toolbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; margin-bottom: 6px; }
+/* grid, not flex: 1fr auto 1fr keeps the action group centred on the window whatever
+   the repo path's length — flex margins would let a long path shove it off-centre */
+.toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; margin-bottom: 6px; }
+/* min-width: 0 lets the path ellipsis instead of widening the column and pushing the centre */
+.tb-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tb-right { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .toolbar button { padding: 3px 10px; }
 .refresh-btn { display: inline-flex; align-items: center; padding: 3px 5px; }
 .refresh-btn .spin { animation: spin .5s cubic-bezier(.45, 0, .55, 1) infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* borderless so the six read as one bar rather than six boxes */
+.tb-actions { display: flex; align-items: center; gap: 2px; }
+.toolbar .tb-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; background: none; border: none; color: var(--fg-dim); }
+.tb-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--fg); }
+.tb-btn:disabled { opacity: .4; cursor: default; }
+.tb-badge { min-width: 15px; padding: 0 4px; border-radius: 7px; background: var(--bg-selected); color: var(--fg); font-size: 11px; line-height: 15px; text-align: center; }
 .repo-path { min-width: 0; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .github-link { display: inline-flex; align-items: center; color: var(--fg-dim); flex-shrink: 0; }
 .github-link:hover { color: var(--fg); }
-.term-btn { display: inline-flex; align-items: center; margin-left: auto; padding: 3px 5px; color: var(--fg-dim); }
+.term-btn { display: inline-flex; align-items: center; padding: 3px 5px; color: var(--fg-dim); }
 .term-btn:hover { color: var(--fg); }
 .term-btn.active { color: var(--fg); background: var(--bg-selected); }
 /* .term-panel, not .terminal — xterm puts class "terminal" on its own root element */

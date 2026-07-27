@@ -74,6 +74,23 @@ export function parseLog(raw: string): Commit[] {
 export const stashIndex = (raw: string, hash: string) =>
   raw.split('\n').filter(Boolean).indexOf(hash)
 
+export type BranchHeader = { head: string | null; upstream: string | null; ahead: number; behind: number }
+
+// The `# branch.*` headers `git status --porcelain=v2 --branch` prepends to the same
+// output parseStatus already reads — so the toolbar's ahead/behind badges cost no
+// extra git process. git omits branch.upstream and branch.ab when there's no upstream.
+export function parseBranchHeader(raw: string): BranchHeader {
+  const field = (name: string) => raw.match(new RegExp(`^# branch\\.${name} (.*)$`, 'm'))?.[1] ?? null
+  const head = field('head')
+  const ab = field('ab')?.match(/^\+(\d+) -(\d+)$/)
+  return {
+    head: head === '(detached)' ? null : head,
+    upstream: field('upstream'),
+    ahead: Number(ab?.[1] ?? 0),
+    behind: Number(ab?.[2] ?? 0),
+  }
+}
+
 export function parseStatus(raw: string): StatusEntry[] {
   const out: StatusEntry[] = []
   for (const line of raw.split('\n')) {

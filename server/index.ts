@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
-import { parseLog, parseMeta, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
+import { parseBranchHeader, parseLog, parseMeta, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal } from './term.ts'
 
@@ -179,7 +179,10 @@ app.get('/api/avatar', repoGuard, async (req, res) => {
 
 app.get('/api/status', repoGuard, async (req, res) => {
   try {
-    res.json({ files: parseStatus(await git(String(req.query.repo), ['status', '--porcelain=v2', '-uall'])) })
+    // --branch prepends the branch/upstream/ahead-behind headers to the output this
+    // already parses — the toolbar's Pull/Push badges for no extra git process
+    const raw = await git(String(req.query.repo), ['status', '--porcelain=v2', '-uall', '--branch'])
+    res.json({ files: parseStatus(raw), branch: parseBranchHeader(raw) })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseLog, parseMeta, parseStatus, stashIndex } from './parse.ts'
+import { parseBranchHeader, parseLog, parseMeta, parseStatus, stashIndex } from './parse.ts'
 
 const F = '\x1f'
 const R = '\x1e'
@@ -61,6 +61,34 @@ describe('parseStatus', () => {
 
   it('handles empty input', () => {
     expect(parseStatus('')).toEqual([])
+  })
+
+  it('ignores the --branch headers', () => {
+    const raw = '# branch.oid aaa\n# branch.head main\n# branch.ab +1 -2\n? untracked.txt'
+    expect(parseStatus(raw)).toEqual([{ path: 'untracked.txt', status: '?', x: '.', y: '?' }])
+  })
+})
+
+describe('parseBranchHeader', () => {
+  it('reads branch, upstream and ahead/behind', () => {
+    const raw = '# branch.oid aaa\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +3 -2\n1 .M N... 1 1 1 a b src/App.tsx'
+    expect(parseBranchHeader(raw)).toEqual({ head: 'main', upstream: 'origin/main', ahead: 3, behind: 2 })
+  })
+
+  it('reports no upstream — git omits the upstream and ab lines entirely', () => {
+    expect(parseBranchHeader('# branch.oid aaa\n# branch.head feature/x')).toEqual({
+      head: 'feature/x', upstream: null, ahead: 0, behind: 0,
+    })
+  })
+
+  it('reports a detached HEAD', () => {
+    expect(parseBranchHeader('# branch.oid aaa\n# branch.head (detached)').head).toBeNull()
+  })
+
+  it('handles an empty repo and missing headers', () => {
+    // unborn branch: oid is "(initial)", but the branch name is still reported
+    expect(parseBranchHeader('# branch.oid (initial)\n# branch.head main').head).toBe('main')
+    expect(parseBranchHeader('')).toEqual({ head: null, upstream: null, ahead: 0, behind: 0 })
   })
 })
 
