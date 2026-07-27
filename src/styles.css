@@ -168,7 +168,8 @@ button:hover { background: var(--border); }
 .section-head { display: flex; align-items: center; gap: 5px; position: sticky; top: 0; z-index: 1; padding: 8px 6px 4px 8px; background: var(--bg-panel); color: var(--fg); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .section-head b { color: var(--fg-dim); font-weight: 600; }
 .section-head .head-actions { margin-left: auto; }
-.composer { padding: 8px; border-top: 1px solid var(--border); flex-shrink: 0; }
+/* mirrors .commit-msg: top of the panel, divider below, never squeezed by the list */
+.composer { padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .composer .msg-box { min-height: 56px; }
 /* stage/unstage: only on the row under the pointer, so the list stays quiet */
 .row-action { visibility: hidden; }

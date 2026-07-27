@@ -310,6 +310,28 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
           </div>
         </>
       )}
+      {/* the composer sits where a commit's message sits — top of the panel, above
+          the file list, so both selections read the same way */}
+      {isWip && (
+        <div className="composer">
+          <textarea
+            className="msg-box"
+            placeholder="Commit message"
+            value={msg}
+            disabled={busy}
+            onChange={e => setMsg(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && sides.staged.length && msg.trim()) commit()
+            }}
+          />
+          <div className="msg-actions">
+            <span className="msg-hint">{sides.staged.length ? '⌘↵ to commit' : 'stage something to commit'}</span>
+            <button className="primary" onClick={commit} disabled={busy || !msg.trim() || !sides.staged.length}>
+              Commit{sides.staged.length ? ` ${sides.staged.length}` : ''}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="files-head">
         <span className="files-counts">
           {COUNT_LABEL.filter(([s]) => counts[s]).map(([s, label, color]) => (
@@ -322,10 +344,8 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
         </span>
       </div>
       {isWip ? (
-        <>
-          {/* unstaged first, staged last — the staged set sits right above the
-              composer, in the order the work actually flows */}
-          <div className="filelist">
+        // unstaged on top, staged below: the order work moves through
+        <div className="filelist">
             <div className="section-head">
               Changes <b>{sides.unstaged.length}</b>
               {/* stage/unstage last: it's the one you reach for repeatedly, so it sits
@@ -355,26 +375,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
             </div>
             <FileList files={sides.staged} side="staged" actions={[{ Icon: MinusIcon, title: 'Unstage', run: unstage }]}
               view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing staged" />
-          </div>
-          <div className="composer">
-            <textarea
-              className="msg-box"
-              placeholder="Commit message"
-              value={msg}
-              disabled={busy}
-              onChange={e => setMsg(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && sides.staged.length && msg.trim()) commit()
-              }}
-            />
-            <div className="msg-actions">
-              <span className="msg-hint">{sides.staged.length ? '⌘↵ to commit' : 'stage something to commit'}</span>
-              <button className="primary" onClick={commit} disabled={busy || !msg.trim() || !sides.staged.length}>
-                Commit{sides.staged.length ? ` ${sides.staged.length}` : ''}
-              </button>
-            </div>
-          </div>
-        </>
+        </div>
       ) : (
         <div className="filelist">
           {view === 'tree' ? (
