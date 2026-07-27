@@ -51,11 +51,11 @@ describe('parseStatus', () => {
       '? untracked.txt',
     ].join('\n')
     expect(parseStatus(raw)).toEqual([
-      { path: 'src/App.tsx', status: 'M' },
-      { path: 'new file.ts', status: 'A' },
-      { path: 'new.ts', status: 'R' },
-      { path: 'conflict.ts', status: 'U' },
-      { path: 'untracked.txt', status: '?' },
+      { path: 'src/App.tsx', status: 'M', x: '.', y: 'M' },
+      { path: 'new file.ts', status: 'A', x: 'A', y: '.' },
+      { path: 'new.ts', status: 'R', x: 'R', y: '.' },
+      { path: 'conflict.ts', status: 'U', x: '.', y: 'U' },
+      { path: 'untracked.txt', status: '?', x: '.', y: '?' },
     ])
   })
 

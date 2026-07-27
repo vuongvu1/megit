@@ -4,6 +4,7 @@ import { api, jsonInit } from './api'
 import { useAvatar, initials } from './avatar'
 import type { Selection } from './RepoView'
 import { buildTree, type TreeNode } from './tree'
+import { splitStatus, type DiffSide } from './wip'
 
 const STATUS_COLOR: Record<string, string> = { M: '#e5c07b', A: '#98c379', D: '#e06c75', R: '#61afef', '?': '#98c379', U: '#e06c75' }
 const COUNT_LABEL: [string, string, string][] = [['M', 'modified', '#e5c07b'], ['A', 'added', '#98c379'], ['D', 'deleted', '#e06c75'], ['R', 'renamed', '#61afef'], ['U', 'conflicted', '#e06c75']]
@@ -15,6 +16,12 @@ const PencilIcon = () => (
   <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11.4 1.9l2.7 2.7-8.5 8.5-3.3.6.6-3.3z" />
     <path d="M9.5 3.8l2.7 2.7" />
+  </svg>
+)
+
+const TrashIcon = () => (
+  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.5h6.6L12 4M6.5 6.5v5M9.5 6.5v5" />
   </svg>
 )
 
@@ -37,22 +44,28 @@ function Person({ repo, name, email, verb, date }: { repo: string; name: string;
   )
 }
 
-function FileRow({ path, name, dir, status, depth, selected, onClick }: { path: string; name: string; dir?: string; status: string; depth: number; selected: boolean; onClick: () => void }) {
+type RowAction = { label: string; title: string; run: (path: string) => void }
+
+function FileRow({ path, name, dir, status, depth, selected, onClick, action }: { path: string; name: string; dir?: string; status: string; depth: number; selected: boolean; onClick: () => void; action?: RowAction }) {
   return (
     <div className={`file-row${selected ? ' selected' : ''}`} style={{ paddingLeft: 8 + depth * 14 }} onClick={onClick} title={path}>
       <span className="file-status" style={{ color: STATUS_COLOR[status] ?? 'var(--fg)' }}>{status}</span>
       <span className="file-path">{dir && <span className="file-dir">{dir}</span>}{name}</span>
+      {action && (
+        <button className="row-action" title={action.title} onClick={e => { e.stopPropagation(); action.run(path) }}>{action.label}</button>
+      )}
     </div>
   )
 }
 
-function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect }: {
+function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect, action }: {
   nodes: TreeNode[]
   depth: number
   collapsed: Set<string>
   onToggle: (path: string) => void
   file: string | null
   onFileSelect: (file: string) => void
+  action?: RowAction
 }) {
   return (
     <>
@@ -64,25 +77,57 @@ function Tree({ nodes, depth, collapsed, onToggle, file, onFileSelect }: {
               <span className="file-dir">{n.name}</span>
             </div>
             {!collapsed.has(n.path) && (
-              <Tree nodes={n.children} depth={depth + 1} collapsed={collapsed} onToggle={onToggle} file={file} onFileSelect={onFileSelect} />
+              <Tree nodes={n.children} depth={depth + 1} collapsed={collapsed} onToggle={onToggle} file={file} onFileSelect={onFileSelect} action={action} />
             )}
           </div>
         ) : (
-          <FileRow key={n.path} path={n.path} name={n.name} status={n.status!} depth={depth} selected={file === n.path} onClick={() => onFileSelect(n.path)} />
+          <FileRow key={n.path} path={n.path} name={n.name} status={n.status!} depth={depth} selected={file === n.path} onClick={() => onFileSelect(n.path)} action={action} />
         ),
       )}
     </>
   )
 }
 
-export default function CommitPanel({ repo, selection, status, file, onFileSelect, canAmend, onAmended }: {
+// one WIP section; same rows as the commit view, plus a stage/unstage button and
+// a side so a partially staged file highlights only in the half you clicked
+function FileList({ files, side, action, view, collapsed, onToggle, file, fileSide, onFileSelect, empty }: {
+  files: StatusEntry[]
+  side: DiffSide
+  action: RowAction
+  view: 'path' | 'tree'
+  collapsed: Set<string>
+  onToggle: (path: string) => void
+  file: string | null
+  fileSide?: DiffSide
+  onFileSelect: (file: string, side?: DiffSide) => void
+  empty: string
+}) {
+  const tree = useMemo(() => (view === 'tree' ? buildTree(files) : []), [view, files])
+  const selected = file && fileSide === side ? file : null
+  const select = (path: string) => onFileSelect(path, side)
+  if (!files.length) return <div className="empty">{empty}</div>
+  return view === 'tree' ? (
+    <Tree nodes={tree} depth={0} collapsed={collapsed} onToggle={onToggle} file={selected} onFileSelect={select} action={action} />
+  ) : (
+    <>
+      {files.map(f => {
+        const cut = f.path.lastIndexOf('/') + 1
+        return <FileRow key={f.path} path={f.path} name={f.path.slice(cut)} dir={cut ? f.path.slice(0, cut) : undefined} status={f.status} depth={0} selected={selected === f.path} onClick={() => select(f.path)} action={action} />
+      })}
+    </>
+  )
+}
+
+export default function CommitPanel({ repo, selection, status, file, fileSide, onFileSelect, canAmend, onCommitted, onChanged }: {
   repo: string
   selection: Selection
   status: StatusEntry[]
   file: string | null
-  onFileSelect: (file: string) => void
+  fileSide?: DiffSide
+  onFileSelect: (file: string, side?: DiffSide) => void
   canAmend: boolean // selection is the tip of the checked-out branch
-  onAmended: (hash: string) => void
+  onCommitted: (hash: string) => void
+  onChanged: () => void // staged/discarded — refetch, selection stays put
 }) {
   const [fetched, setFetched] = useState<StatusEntry[]>([])
   const [meta, setMeta] = useState<CommitMeta | null>(null)
@@ -91,6 +136,10 @@ export default function CommitPanel({ repo, selection, status, file, onFileSelec
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [draft, setDraft] = useState<string | null>(null) // null = not editing
   const [saving, setSaving] = useState(false)
+  // survives refreshes: the wip selection object is identity-stable, so a background
+  // refetch mid-typing can't wipe what's in the composer
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setError('')
@@ -104,7 +153,9 @@ export default function CommitPanel({ repo, selection, status, file, onFileSelec
       .catch(e => setError(e.message))
   }, [repo, selection])
 
-  const files = selection?.kind === 'wip' ? status : fetched
+  const isWip = selection?.kind === 'wip'
+  const files = isWip ? status : fetched
+  const sides = useMemo(() => splitStatus(isWip ? status : []), [isWip, status])
   const tree = useMemo(() => (view === 'tree' ? buildTree(files) : []), [view, files])
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -133,6 +184,26 @@ export default function CommitPanel({ repo, selection, status, file, onFileSelec
   const bodyText = body.join('\n').trim()
   const coAuthored = meta && (meta.committer !== meta.author || meta.committerEmail !== meta.authorEmail)
 
+  const wipPost = (body: object, label: string, after: (r: { hash?: string }) => void) => {
+    setBusy(true)
+    setError('')
+    api<{ hash?: string }>(`/api/wip?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
+      .then(after)
+      .catch((err: Error) => setError(`${label} failed: ${err.message}`))
+      .finally(() => setBusy(false))
+  }
+  const stage = (path: string) => wipPost({ action: 'stage', path }, 'Stage', onChanged)
+  const unstage = (path: string) => wipPost({ action: 'unstage', path }, 'Unstage', onChanged)
+  const discardAll = () => {
+    if (!confirm(`Discard all ${files.length} uncommitted change${files.length > 1 ? 's' : ''}?\n\nStaged and unstaged edits go back to HEAD and untracked files are deleted. This cannot be undone — "Stash changes" on the row keeps them instead.`)) return
+    wipPost({ action: 'discard' }, 'Discard', onChanged)
+  }
+  const commit = () =>
+    wipPost({ action: 'commit', message: msg.trim() }, 'Commit', r => {
+      setMsg('')
+      if (r.hash) onCommitted(r.hash)
+    })
+
   const save = () => {
     if (selection.kind !== 'commit') return
     const message = (draft ?? '').trim()
@@ -152,7 +223,7 @@ export default function CommitPanel({ repo, selection, status, file, onFileSelec
           ? post(true)
           : null
       })
-      .then(r => { if (r) { setDraft(null); onAmended(r.hash) } })
+      .then(r => { if (r) { setDraft(null); onCommitted(r.hash) } })
       .catch((err: Error) => setError(`Edit message failed: ${err.message}`))
       .finally(() => setSaving(false))
   }
@@ -211,18 +282,56 @@ export default function CommitPanel({ repo, selection, status, file, onFileSelec
           <button className={view === 'path' ? 'active' : ''} onClick={() => setViewPersist('path')}>Path</button>
           <button className={view === 'tree' ? 'active' : ''} onClick={() => setViewPersist('tree')}>Tree</button>
         </span>
-      </div>
-      <div className="filelist">
-        {view === 'tree' ? (
-          <Tree nodes={tree} depth={0} collapsed={collapsed} onToggle={onToggle} file={file} onFileSelect={onFileSelect} />
-        ) : (
-          files.map(f => {
-            const cut = f.path.lastIndexOf('/') + 1
-            return <FileRow key={f.path} path={f.path} name={f.path.slice(cut)} dir={cut ? f.path.slice(0, cut) : undefined} status={f.status} depth={0} selected={file === f.path} onClick={() => onFileSelect(f.path)} />
-          })
+        {isWip && files.length > 0 && (
+          <button className="wip-discard" title="Discard all changes" aria-label="Discard all changes" onClick={discardAll} disabled={busy}>
+            <TrashIcon />
+          </button>
         )}
-        {!error && files.length === 0 && <div className="empty">No changes</div>}
       </div>
+      {isWip ? (
+        <>
+          {/* unstaged first, staged last — the staged set sits right above the
+              composer, in the order the work actually flows */}
+          <div className="filelist">
+            <div className="section-head">Changes <b>{sides.unstaged.length}</b></div>
+            <FileList files={sides.unstaged} side="worktree" action={{ label: '+', title: 'Stage', run: stage }}
+              view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing to stage" />
+            <div className="section-head">Staged Changes <b>{sides.staged.length}</b></div>
+            <FileList files={sides.staged} side="staged" action={{ label: '−', title: 'Unstage', run: unstage }}
+              view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing staged" />
+          </div>
+          <div className="composer">
+            <textarea
+              className="msg-box"
+              placeholder="Commit message"
+              value={msg}
+              disabled={busy}
+              onChange={e => setMsg(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && sides.staged.length && msg.trim()) commit()
+              }}
+            />
+            <div className="msg-actions">
+              <span className="msg-hint">{sides.staged.length ? '⌘↵ to commit' : 'stage something to commit'}</span>
+              <button className="primary" onClick={commit} disabled={busy || !msg.trim() || !sides.staged.length}>
+                Commit{sides.staged.length ? ` ${sides.staged.length}` : ''}
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="filelist">
+          {view === 'tree' ? (
+            <Tree nodes={tree} depth={0} collapsed={collapsed} onToggle={onToggle} file={file} onFileSelect={onFileSelect} />
+          ) : (
+            files.map(f => {
+              const cut = f.path.lastIndexOf('/') + 1
+              return <FileRow key={f.path} path={f.path} name={f.path.slice(cut)} dir={cut ? f.path.slice(0, cut) : undefined} status={f.status} depth={0} selected={file === f.path} onClick={() => onFileSelect(f.path)} />
+            })
+          )}
+          {!error && files.length === 0 && <div className="empty">No changes</div>}
+        </div>
+      )}
     </div>
   )
 }

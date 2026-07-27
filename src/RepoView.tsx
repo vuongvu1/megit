@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSPrope
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api } from './api'
 import GraphView from './GraphView'
+import type { DiffSide } from './wip'
 import CommitPanel from './CommitPanel'
 import ThemeSwitch from './ThemeSwitch'
 
@@ -20,7 +21,9 @@ const termOpenByRepo = new Map<string, boolean>()
 // path+code pairs. Identical fingerprint → skip setState → no full-list re-render.
 const graphFp = (commits: Commit[], hasMore: boolean, stashes: StashEntry[] = []) =>
   commits.map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + (hasMore ? '+' : '') + stashes.map(s => s.hash).join(',')
-const statusFp = (files: StatusEntry[]) => files.map(f => f.status + f.path).join('\n')
+// x/y, not the collapsed status: staging a modified file moves it from ".M" to "M."
+// while `status` stays "M", so hashing only that made staging invisible to the panel
+const statusFp = (files: StatusEntry[]) => files.map(f => `${f.x ?? ''}${f.y ?? ''}${f.status}${f.path}`).join('\n')
 
 export default function RepoView({ repo, onRemove }: { repo: string; onRemove: () => void }) {
   const [commits, setCommits] = useState<Commit[]>([])
@@ -30,7 +33,8 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [stashes, setStashes] = useState<StashEntry[]>([])
   const [status, setStatus] = useState<StatusEntry[]>([])
   const [selection, setSelection] = useState<Selection>(null)
-  const [file, setFile] = useState<string | null>(null)
+  // side is set only from the WIP panel's two sections — it picks which diff to show
+  const [file, setFile] = useState<{ path: string; side?: DiffSide } | null>(null)
   const [error, setError] = useState<{ msg: string; gone: boolean } | null>(null)
   const [wipTick, setWipTick] = useState(0)
   const [spinning, setSpinning] = useState(false)
@@ -241,11 +245,12 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
           {file && selection && (
             <div className="diff-overlay">
               <div className="diff-overlay-head">
-                <span className="file-path">{file}</span>
+                <span className="file-path">{file.path}</span>
+                {file.side && <span className="diff-side">{file.side === 'staged' ? 'staged' : 'unstaged'}</span>}
                 <button className="diff-close" onClick={() => setFile(null)} title="Close diff">✕</button>
               </div>
               <Suspense fallback={<div className="diffview empty">Loading…</div>}>
-                <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file} wipTick={wipTick} />
+                <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file.path} side={file.side} wipTick={wipTick} />
               </Suspense>
             </div>
           )}
@@ -257,12 +262,14 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
               selection={selection}
               status={status}
               repo={repo}
-              file={file}
-              onFileSelect={setFile}
+              file={file?.path ?? null}
+              fileSide={file?.side}
+              onFileSelect={(path, side) => setFile({ path, side })}
               canAmend={selection?.kind === 'commit' && selection.hash === headCommit?.hash}
-              // amending rewrites the sha: follow the selection to the new commit,
-              // otherwise the refresh below drops it as a commit that no longer exists
-              onAmended={hash => { setSelection({ kind: 'commit', hash }); refresh() }}
+              // amend rewrites the sha and commit makes a new one: either way follow the
+              // selection there, or the refresh drops it as a commit that no longer exists
+              onCommitted={hash => { setSelection({ kind: 'commit', hash }); refresh() }}
+              onChanged={refresh}
             />
           </>
         )}

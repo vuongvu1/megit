@@ -454,6 +454,51 @@ app.post('/api/commit', repoGuard, async (req, res) => {
   }
 })
 
+app.post('/api/wip', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const action = String(req.body.action ?? '')
+  try {
+    // Every pathspec is matched against a status read taken right now, and goes
+    // after `--`. That matters most for discard: it runs `git clean`, so a path
+    // the request invented would be arbitrary file deletion.
+    const mustBeDirty = async () => {
+      const path = String(req.body.path ?? '')
+      const dirty = parseStatus(await git(repo, ['status', '--porcelain=v2', '-uall']))
+      if (!dirty.some(f => f.path === path)) throw httpError(400, `no uncommitted change at: ${path}`)
+      return path
+    }
+    switch (action) {
+      case 'stage':
+        await git(repo, ['add', '--', await mustBeDirty()])
+        break
+      case 'unstage':
+        await git(repo, ['restore', '--staged', '--', await mustBeDirty()])
+        break
+      case 'discard':
+        // everything back to HEAD: tracked files restored on both sides, untracked
+        // removed. No -x — ignored files (node_modules, .env) are not "changes".
+        await git(repo, ['restore', '--staged', '--worktree', '--', '.'])
+        await git(repo, ['clean', '-fd'])
+        break
+      case 'commit': {
+        const message = String(req.body.message ?? '').trim()
+        if (!message) throw httpError(400, 'empty commit message')
+        // hooks run as they would in a terminal — this commit has real content —
+        // but a hook that blocks on stdin gets killed rather than wedging the request
+        await git(repo, ['commit', `--message=${message}`], [0], NET_TIMEOUT)
+        res.json({ ok: true, hash: (await git(repo, ['rev-parse', 'HEAD'])).trim() })
+        return
+      }
+      default:
+        throw httpError(400, `unknown action: ${action}`)
+    }
+    res.json({ ok: true })
+  } catch (e) {
+    const err = e as Error
+    res.status((err as { status?: number }).status ?? 409).json({ error: err.message })
+  }
+})
+
 app.get('/api/events', repoGuard, (req, res) => {
   const repo = String(req.query.repo)
   res.writeHead(200, {
@@ -533,8 +578,13 @@ app.get('/api/diff', repoGuard, async (req, res) => {
       diff = parent
         ? await git(repo, ['diff', parent, hash, '--', file])
         : await git(repo, ['show', '--format=', hash, '--', file])
+    } else if (req.query.side === 'staged') {
+      // HEAD vs index only — the merged HEAD-vs-worktree diff below would be empty
+      // for a file that's fully staged, and misleading for a partially staged one
+      diff = await git(repo, ['diff', '--cached', '--', file])
     } else {
-      diff = await git(repo, ['diff', 'HEAD', '--', file])
+      // index vs worktree for the unstaged side, HEAD vs worktree when no side is given
+      diff = await git(repo, ['diff', ...(req.query.side === 'worktree' ? [] : ['HEAD']), '--', file])
       // untracked file: not in HEAD diff; --no-index exits 1 when files differ
       if (!diff.trim()) diff = await git(repo, ['diff', '--no-index', '--', '/dev/null', file], [0, 1])
     }

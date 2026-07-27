@@ -7,7 +7,7 @@ import { useTheme } from './theme'
 
 type DiffResp = { diff?: string; tooLarge?: boolean; size?: number }
 
-export default function DiffView({ repo, hash, file, wipTick }: { repo: string; hash: string | null; file: string; wipTick: number }) {
+export default function DiffView({ repo, hash, file, side, wipTick }: { repo: string; hash: string | null; file: string; side?: 'staged' | 'worktree'; wipTick: number }) {
   const [resp, setResp] = useState<DiffResp | null>(null)
   const [error, setError] = useState('')
   const [split, setSplit] = useState(() => localStorage.getItem('megit-diff-split') === '1')
@@ -19,7 +19,7 @@ export default function DiffView({ repo, hash, file, wipTick }: { repo: string; 
       setError('')
       setResp(null)
     }
-    const params = new URLSearchParams({ repo, file, ...(hash ? { hash } : {}), ...(force ? { force: '1' } : {}) })
+    const params = new URLSearchParams({ repo, file, ...(hash ? { hash } : {}), ...(side ? { side } : {}), ...(force ? { force: '1' } : {}) })
     api<DiffResp>(`/api/diff?${params}`)
       .then(r => { setError(''); setResp(r) })
       .catch(e => { if (!silent) setError(e.message) })
@@ -28,7 +28,7 @@ export default function DiffView({ repo, hash, file, wipTick }: { repo: string; 
   // must not trigger a reload; only later increments do. Commit diffs (hash
   // set) never reload — same hash, same content.
   const seenTick = useRef(wipTick)
-  useEffect(() => { seenTick.current = wipTick; load() }, [repo, hash, file])
+  useEffect(() => { seenTick.current = wipTick; load() }, [repo, hash, file, side])
   useEffect(() => {
     if (wipTick === seenTick.current) return
     seenTick.current = wipTick

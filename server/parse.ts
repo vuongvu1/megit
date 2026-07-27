@@ -8,7 +8,11 @@ export type Commit = {
   subject: string
 }
 
-export type StatusEntry = { path: string; status: string }
+// x/y are porcelain-v2's index and worktree codes ('.' = unchanged on that side).
+// They're what splits the WIP panel into staged and unstaged; a partially staged
+// file has both set and belongs in both lists. Absent on commit file lists, which
+// have no sides. `status` stays the single code the graph and tree render.
+export type StatusEntry = { path: string; status: string; x?: string; y?: string }
 export type StashEntry = { hash: string; parent: string; date: number; subject: string }
 
 export type CommitMeta = {
@@ -78,15 +82,17 @@ export function parseStatus(raw: string): StatusEntry[] {
     const parts = line.split(' ')
     if (kind === '1') {
       const xy = parts[1]
-      out.push({ path: parts.slice(8).join(' '), status: xy[1] !== '.' ? xy[1] : xy[0] })
+      out.push({ path: parts.slice(8).join(' '), status: xy[1] !== '.' ? xy[1] : xy[0], x: xy[0], y: xy[1] })
     } else if (kind === '2') {
       // rename/copy: extra score field, then "newPath\toldPath"
       const xy = parts[1]
-      out.push({ path: parts.slice(9).join(' ').split('\t')[0], status: xy[0] === '.' ? xy[1] : xy[0] })
+      out.push({ path: parts.slice(9).join(' ').split('\t')[0], status: xy[0] === '.' ? xy[1] : xy[0], x: xy[0], y: xy[1] })
     } else if (kind === 'u') {
-      out.push({ path: parts.slice(10).join(' '), status: 'U' })
+      // conflicts are neither staged nor unstaged — they sit on the worktree side
+      // until resolved, so they show up under Changes and can't be committed as-is
+      out.push({ path: parts.slice(10).join(' '), status: 'U', x: '.', y: 'U' })
     } else if (kind === '?') {
-      out.push({ path: line.slice(2), status: '?' })
+      out.push({ path: line.slice(2), status: '?', x: '.', y: '?' })
     }
   }
   return out
