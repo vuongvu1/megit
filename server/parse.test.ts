@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { parseBranchHeader, parseLog, parseMeta, parseStatus, stashIndex } from './parse.ts'
+import { parseBranchHeader, parseLog, parseMeta, parseNameStatus, parseStatus, stashIndex } from './parse.ts'
 
 const F = '\x1f'
 const R = '\x1e'
+// -z output: every record NUL-terminated, so a fixture ends with one too
+const z = (...recs: string[]) => recs.map(r => r + '\0').join('')
 
 describe('parseLog', () => {
   it('parses records with refs and parents', () => {
@@ -43,13 +45,15 @@ describe('parseMeta', () => {
 
 describe('parseStatus', () => {
   it('parses porcelain v2 entries', () => {
-    const raw = [
+    const raw = z(
       '1 .M N... 100644 100644 100644 abc def src/App.tsx',
       '1 A. N... 000000 100644 100644 000 111 new file.ts',
-      '2 R. N... 100644 100644 100644 abc def R100 new.ts\told.ts',
+      // rename: under -z the original path is its own record after the entry
+      '2 R. N... 100644 100644 100644 abc def R100 new.ts',
+      'old.ts',
       'u UU N... 100644 100644 100644 100644 a b c conflict.ts',
       '? untracked.txt',
-    ].join('\n')
+    )
     expect(parseStatus(raw)).toEqual([
       { path: 'src/App.tsx', status: 'M', x: '.', y: 'M' },
       { path: 'new file.ts', status: 'A', x: 'A', y: '.' },
@@ -59,36 +63,79 @@ describe('parseStatus', () => {
     ])
   })
 
+  // the whole reason for -z: these paths come back raw instead of C-quoted
+  // ("\303\274mlaut.txt"), which is what git needs to accept them as a pathspec
+  it('keeps paths with non-ASCII bytes, tabs and quotes usable', () => {
+    const raw = z(
+      '1 .M N... 100644 100644 100644 abc def ümlaut.txt',
+      '? tab\tname.txt',
+      '? quote"name.txt',
+      '2 R. N... 100644 100644 100644 abc def R100 renamed ünder.txt',
+      'plain space.txt',
+    )
+    expect(parseStatus(raw).map(f => f.path)).toEqual([
+      'ümlaut.txt', 'tab\tname.txt', 'quote"name.txt', 'renamed ünder.txt',
+    ])
+  })
+
+  it('does not mistake a rename original for its own entry', () => {
+    // "1 file.ts" as an original path would parse as a type-1 entry if not skipped
+    const raw = z('2 R. N... 100644 100644 100644 abc def R100 new.ts', '? weird.ts')
+    expect(parseStatus(raw)).toEqual([{ path: 'new.ts', status: 'R', x: 'R', y: '.' }])
+  })
+
   it('handles empty input', () => {
     expect(parseStatus('')).toEqual([])
   })
 
   it('ignores the --branch headers', () => {
-    const raw = '# branch.oid aaa\n# branch.head main\n# branch.ab +1 -2\n? untracked.txt'
+    const raw = z('# branch.oid aaa', '# branch.head main', '# branch.ab +1 -2', '? untracked.txt')
     expect(parseStatus(raw)).toEqual([{ path: 'untracked.txt', status: '?', x: '.', y: '?' }])
+  })
+})
+
+describe('parseNameStatus', () => {
+  it('pairs each status with its path, two paths for a rename', () => {
+    const raw = z('M', 'src/App.tsx', 'A', 'ümlaut.txt', 'R100', 'old.ts', 'new.ts', 'D', 'gone.ts')
+    expect(parseNameStatus(raw)).toEqual([
+      { status: 'M', path: 'src/App.tsx' },
+      { status: 'A', path: 'ümlaut.txt' },
+      { status: 'R', path: 'new.ts' }, // the name it has now, not the one it had
+      { status: 'D', path: 'gone.ts' },
+    ])
+  })
+
+  it('handles empty input and a truncated trailing record', () => {
+    expect(parseNameStatus('')).toEqual([])
+    expect(parseNameStatus(z('M'))).toEqual([])
   })
 })
 
 describe('parseBranchHeader', () => {
   it('reads branch, upstream and ahead/behind', () => {
-    const raw = '# branch.oid aaa\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +3 -2\n1 .M N... 1 1 1 a b src/App.tsx'
+    const raw = z('# branch.oid aaa', '# branch.head main', '# branch.upstream origin/main', '# branch.ab +3 -2', '1 .M N... 1 1 1 a b src/App.tsx')
     expect(parseBranchHeader(raw)).toEqual({ head: 'main', upstream: 'origin/main', ahead: 3, behind: 2 })
   })
 
   it('reports no upstream — git omits the upstream and ab lines entirely', () => {
-    expect(parseBranchHeader('# branch.oid aaa\n# branch.head feature/x')).toEqual({
+    expect(parseBranchHeader(z('# branch.oid aaa', '# branch.head feature/x'))).toEqual({
       head: 'feature/x', upstream: null, ahead: 0, behind: 0,
     })
   })
 
   it('reports a detached HEAD', () => {
-    expect(parseBranchHeader('# branch.oid aaa\n# branch.head (detached)').head).toBeNull()
+    expect(parseBranchHeader(z('# branch.oid aaa', '# branch.head (detached)')).head).toBeNull()
   })
 
   it('handles an empty repo and missing headers', () => {
     // unborn branch: oid is "(initial)", but the branch name is still reported
-    expect(parseBranchHeader('# branch.oid (initial)\n# branch.head main').head).toBe('main')
+    expect(parseBranchHeader(z('# branch.oid (initial)', '# branch.head main')).head).toBe('main')
     expect(parseBranchHeader('')).toEqual({ head: null, upstream: null, ahead: 0, behind: 0 })
+  })
+
+  // a slash is legal in a branch name and the value runs to the record end
+  it('keeps the whole value, not just the first word', () => {
+    expect(parseBranchHeader(z('# branch.head feat/some thing')).head).toBe('feat/some thing')
   })
 })
 

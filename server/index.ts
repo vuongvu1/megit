@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
-import { parseBranchHeader, parseLog, parseMeta, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
+import { parseBranchHeader, parseLog, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal } from './term.ts'
 
@@ -41,9 +41,14 @@ const GIT_ENV = {
   GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
 }
 
+// core.quotePath=false: git otherwise C-quotes non-ASCII paths in every kind of
+// output, and a quoted literal fed back as a pathspec matches nothing. The `-z`
+// readers below don't need it, but `git show`/`ls-files`/error messages do.
+const QUOTE_PATH = ['-c', 'core.quotePath=false']
+
 function git(repo: string, args: string[], okCodes: number[] = [0], timeout = 0, env?: Record<string, string>): Promise<string> {
   return new Promise((res, rej) => {
-    execFile('git', ['-C', repo, ...args], { maxBuffer: 50 * 1024 * 1024, env: { ...GIT_ENV, ...env }, timeout }, (err, stdout, stderr) => {
+    execFile('git', ['-C', repo, ...QUOTE_PATH, ...args], { maxBuffer: 50 * 1024 * 1024, env: { ...GIT_ENV, ...env }, timeout }, (err, stdout, stderr) => {
       if (err && (err as { killed?: boolean }).killed) {
         rej(new Error(`git ${args[0]} timed out after ${timeout / 1000}s`))
       } else if (err && !okCodes.includes(typeof err.code === 'number' ? err.code : 1)) {
@@ -134,7 +139,10 @@ app.get('/api/fs', (req, res) => {
 app.get('/api/graph', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const skip = Number(req.query.skip) || 0
-  const limit = Math.max(1, Number(req.query.limit) || 100)
+  // capped: the client asks for as many as it has loaded, which grows a page at a
+  // time, but an uncapped limit turns one request into the whole history (4.2 MB /
+  // 380 ms on a 14.8k-commit repo). 5000 rows is far past where the DOM gives out.
+  const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 100))
   try {
     const stashRaw = await git(repo, ['stash', 'list', '--format=%H%x1f%P%x1f%ct%x1f%s']).catch(() => '')
     const stashes = stashRaw.split('\n').filter(Boolean).map(l => {
@@ -182,7 +190,7 @@ app.get('/api/status', repoGuard, async (req, res) => {
   try {
     // --branch prepends the branch/upstream/ahead-behind headers to the output this
     // already parses — the toolbar's Pull/Push badges for no extra git process
-    const raw = await git(String(req.query.repo), ['status', '--porcelain=v2', '-uall', '--branch'])
+    const raw = await git(String(req.query.repo), ['status', '--porcelain=v2', '-uall', '--branch', '-z'])
     res.json({ files: parseStatus(raw), branch: parseBranchHeader(raw) })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
@@ -491,7 +499,7 @@ app.post('/api/wip', repoGuard, async (req, res) => {
     // the request invented would be arbitrary file deletion.
     const mustBeDirty = async () => {
       const path = String(req.body.path ?? '')
-      const dirty = parseStatus(await git(repo, ['status', '--porcelain=v2', '-uall']))
+      const dirty = parseStatus(await git(repo, ['status', '--porcelain=v2', '-uall', '-z']))
       const entry = dirty.find(f => f.path === path)
       if (!entry) throw httpError(400, `no uncommitted change at: ${path}`)
       return entry
@@ -608,13 +616,9 @@ app.get('/api/commit', repoGuard, async (req, res) => {
     const meta = parseMeta(await git(repo, ['show', '-s', `--format=${META_FORMAT}`, hash]))
     const parent = meta.parents[0] ?? null
     const raw = parent
-      ? await git(repo, ['diff', '--name-status', parent, hash])
-      : await git(repo, ['diff-tree', '-r', '--root', '--no-commit-id', '--name-status', hash])
-    const files = raw.split('\n').filter(Boolean).map(l => {
-      const cols = l.split('\t')
-      return { status: cols[0][0], path: cols[cols.length - 1] }
-    })
-    res.json({ files, meta })
+      ? await git(repo, ['diff', '--name-status', '-z', parent, hash])
+      : await git(repo, ['diff-tree', '-r', '--root', '--no-commit-id', '--name-status', '-z', hash])
+    res.json({ files: parseNameStatus(raw), meta })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
   }

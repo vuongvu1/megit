@@ -76,24 +76,38 @@ export const stashIndex = (raw: string, hash: string) =>
 
 export type BranchHeader = { head: string | null; upstream: string | null; ahead: number; behind: number }
 
+// Everything below reads `-z` output: one NUL-terminated record per entry, headers
+// included. Without it git C-quotes any path holding a non-ASCII byte, a tab or a
+// `"` ("\303\274mlaut.txt"), and that literal can't go back to git as a pathspec —
+// staging, discarding and diffing such a file all failed with "did not match any
+// files". `-z` paths are raw, so they survive the round trip.
+const records = (raw: string) => raw.split('\0')
+
 // The `# branch.*` headers `git status --porcelain=v2 --branch` prepends to the same
 // output parseStatus already reads — so the toolbar's ahead/behind badges cost no
 // extra git process. git omits branch.upstream and branch.ab when there's no upstream.
 export function parseBranchHeader(raw: string): BranchHeader {
-  const field = (name: string) => raw.match(new RegExp(`^# branch\\.${name} (.*)$`, 'm'))?.[1] ?? null
-  const head = field('head')
-  const ab = field('ab')?.match(/^\+(\d+) -(\d+)$/)
+  const fields = new Map<string, string>()
+  for (const r of records(raw)) {
+    if (!r.startsWith('# branch.')) continue
+    const sp = r.indexOf(' ', 9)
+    if (sp > 0) fields.set(r.slice(9, sp), r.slice(sp + 1))
+  }
+  const head = fields.get('head') ?? null
+  const ab = fields.get('ab')?.match(/^\+(\d+) -(\d+)$/)
   return {
     head: head === '(detached)' ? null : head,
-    upstream: field('upstream'),
+    upstream: fields.get('upstream') ?? null,
     ahead: Number(ab?.[1] ?? 0),
     behind: Number(ab?.[2] ?? 0),
   }
 }
 
 export function parseStatus(raw: string): StatusEntry[] {
+  const recs = records(raw)
   const out: StatusEntry[] = []
-  for (const line of raw.split('\n')) {
+  for (let i = 0; i < recs.length; i++) {
+    const line = recs[i]
     if (!line) continue
     const kind = line[0]
     const parts = line.split(' ')
@@ -101,9 +115,11 @@ export function parseStatus(raw: string): StatusEntry[] {
       const xy = parts[1]
       out.push({ path: parts.slice(8).join(' '), status: xy[1] !== '.' ? xy[1] : xy[0], x: xy[0], y: xy[1] })
     } else if (kind === '2') {
-      // rename/copy: extra score field, then "newPath\toldPath"
+      // rename/copy: extra score field, and under -z the original path is its own
+      // record rather than a \t-joined suffix — skip it, nothing here reads it
       const xy = parts[1]
-      out.push({ path: parts.slice(9).join(' ').split('\t')[0], status: xy[0] === '.' ? xy[1] : xy[0], x: xy[0], y: xy[1] })
+      out.push({ path: parts.slice(9).join(' '), status: xy[0] === '.' ? xy[1] : xy[0], x: xy[0], y: xy[1] })
+      i++
     } else if (kind === 'u') {
       // conflicts are neither staged nor unstaged — they sit on the worktree side
       // until resolved, so they show up under Changes and can't be committed as-is
@@ -111,6 +127,24 @@ export function parseStatus(raw: string): StatusEntry[] {
     } else if (kind === '?') {
       out.push({ path: line.slice(2), status: '?', x: '.', y: '?' })
     }
+  }
+  return out
+}
+
+// `git diff --name-status -z`: a status record then its path record, except
+// rename/copy, which spends two paths (old, then new — the new one is what the
+// commit's file list shows).
+export function parseNameStatus(raw: string): { status: string; path: string }[] {
+  const recs = records(raw)
+  const out: { status: string; path: string }[] = []
+  for (let i = 0; i < recs.length; i++) {
+    const st = recs[i]
+    if (!st) continue
+    const paths = st[0] === 'R' || st[0] === 'C' ? 2 : 1
+    // no path record (truncated output): a status with no file is nothing to show
+    if (!recs[i + paths]) break
+    out.push({ status: st[0], path: recs[i + paths] })
+    i += paths
   }
   return out
 }

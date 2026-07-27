@@ -1,10 +1,32 @@
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState, type ReactNode } from 'react'
 import { api, jsonInit } from './api'
 import TabBar from './TabBar'
 import DirBrowser from './DirBrowser'
 import RepoView from './RepoView'
 
 export type Config = { repos: string[]; activeRepo: string | null }
+
+// Fetch failures already surface inside RepoView; a *render* throw is the one that
+// unmounts the tree and leaves a blank window with only the console to explain it.
+// No hook does this — a class is the whole API. Keyed by repo below, so switching
+// tabs is itself a reset.
+class Boundary extends Component<{ children: ReactNode }, { err: Error | null }> {
+  state: { err: Error | null } = { err: null }
+  static getDerivedStateFromError(err: Error) {
+    return { err }
+  }
+  render() {
+    if (!this.state.err) return this.props.children
+    return (
+      <div className="empty">
+        <div>
+          <div className="error">{this.state.err.message}</div>
+          <button onClick={() => this.setState({ err: null })}>Try again</button>
+        </div>
+      </div>
+    )
+  }
+}
 
 export default function App() {
   const [cfg, setCfg] = useState<Config | null>(null)
@@ -33,7 +55,11 @@ export default function App() {
       <TabBar repos={cfg.repos} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} onReorder={reorder} onReorderEnd={reorderEnd} />
       {browsing && <DirBrowser onPicked={c => { setCfg(c); setBrowsing(false) }} onClose={() => setBrowsing(false)} />}
       {cfg.activeRepo
-        ? <RepoView key={cfg.activeRepo} repo={cfg.activeRepo} onRemove={() => close(cfg.activeRepo!)} />
+        ? (
+          <Boundary key={cfg.activeRepo}>
+            <RepoView repo={cfg.activeRepo} onRemove={() => close(cfg.activeRepo!)} />
+          </Boundary>
+        )
         : <div className="empty">No repository open — add one with “+”</div>}
     </div>
   )

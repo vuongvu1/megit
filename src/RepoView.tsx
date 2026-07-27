@@ -22,6 +22,14 @@ const termOpenByRepo = new Map<string, boolean>()
 // path+code pairs. Identical fingerprint → skip setState → no full-list re-render.
 const graphFp = (commits: Commit[], hasMore: boolean, stashes: StashEntry[] = []) =>
   commits.map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + (hasMore ? '+' : '') + stashes.map(s => s.hash).join(',')
+
+// One page, the server's own default and the client's paging step.
+const PAGE = 100
+// Probe fingerprint for a silent refresh: the first page plus the stash list, which
+// arrives whole at any limit. No hasMore — a 100-commit probe always reports more
+// while 150 rows are loaded, and that difference isn't a change in the repo.
+const headFp = (commits: Commit[], stashes: StashEntry[] = []) =>
+  commits.slice(0, PAGE).map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + stashes.map(s => s.hash).join(',')
 // x/y, not the collapsed status: staging a modified file moves it from ".M" to "M."
 // while `status` stays "M", so hashing only that made staging invisible to the panel
 // the branch header goes in too: a push changes nothing about the files, but leaves
@@ -53,18 +61,26 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [refsW, setRefsW] = useState(() => Number(localStorage.getItem('megit-refs-w')) || 120)
   const [graphColW, setGraphColW] = useState(() => Number(localStorage.getItem('megit-graph-col')) || 90)
 
-  const fps = useRef({ graph: '', status: '' })
+  const fps = useRef({ graph: '', status: '', head: '' })
   const loaded = useRef(0)
   loaded.current = commits.length
   const gen = useRef(0)
 
   const q = `repo=${encodeURIComponent(repo)}`
 
-  const refresh = useCallback((silent = false) => {
+  // `full` refetches every row currently loaded; a silent refresh instead probes the
+  // first page and only pays for the rest once that page has actually moved. An fs
+  // event fires every 400 ms–2 s, and the full refetch was 277 KB / 209 ms at 1000
+  // rows loaded — a cost that grew with every "Load more". A rewrite that lands
+  // entirely below page 1 (deep rebase) needs a manual `r`.
+  // named function expression, not an arrow: a probe that finds page 1 moved calls
+  // straight back into `run` for the full refetch
+  const refresh = useCallback(function run(silent = false, full = !silent) {
     // spin only on manual refresh — silent SSE refetches must not re-render RepoView
     if (!silent) { setError(null); inflight.current = true; setSpinning(true) }
     const g = ++gen.current
-    const limit = Math.max(loaded.current, 100)
+    const probe = !full && loaded.current > PAGE
+    const limit = probe ? PAGE : Math.max(loaded.current, PAGE)
     Promise.all([
       api<{ commits: Commit[]; hasMore: boolean; remotes: string[]; stashes: StashEntry[]; githubUrl: string | null }>(`/api/graph?${q}&limit=${limit}`),
       api<{ files: StatusEntry[]; branch: BranchHeader }>(`/api/status?${q}`),
@@ -72,20 +88,27 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       if (g !== gen.current) return // superseded by a newer request — latest wins
       inflight.current = false // spin stops at next iteration boundary, never mid-turn
       setError(null)
-      const gf = graphFp(gRes.commits, gRes.hasMore, gRes.stashes)
-      if (fps.current.graph !== gf) {
-        fps.current.graph = gf
-        setCommits(gRes.commits)
-        setHasMore(gRes.hasMore)
-        setRemotes(gRes.remotes)
-        setStashes(gRes.stashes ?? [])
-        setGithubUrl(gRes.githubUrl ?? null)
-        // commit rewritten away (rebase/amend) → back to initial-load selection.
-        // stashes count as selectable rows, so a selected stash isn't "gone".
-        setSelection(sel =>
-          sel?.kind === 'commit'
-            && !gRes.commits.some(c => c.hash === sel.hash)
-            && !(gRes.stashes ?? []).some(s => s.hash === sel.hash) ? null : sel)
+      if (probe) {
+        // page 1 hasn't moved: nothing loaded below it can have changed either, so
+        // the rows stay as they are. Moved → refetch the whole loaded range now.
+        if (headFp(gRes.commits, gRes.stashes) !== fps.current.head) run(true, true)
+      } else {
+        fps.current.head = headFp(gRes.commits, gRes.stashes)
+        const gf = graphFp(gRes.commits, gRes.hasMore, gRes.stashes)
+        if (fps.current.graph !== gf) {
+          fps.current.graph = gf
+          setCommits(gRes.commits)
+          setHasMore(gRes.hasMore)
+          setRemotes(gRes.remotes)
+          setStashes(gRes.stashes ?? [])
+          setGithubUrl(gRes.githubUrl ?? null)
+          // commit rewritten away (rebase/amend) → back to initial-load selection.
+          // stashes count as selectable rows, so a selected stash isn't "gone".
+          setSelection(sel =>
+            sel?.kind === 'commit'
+              && !gRes.commits.some(c => c.hash === sel.hash)
+              && !(gRes.stashes ?? []).some(s => s.hash === sel.hash) ? null : sel)
+        }
       }
       const sb = s.branch ?? NO_BRANCH
       const sf = statusFp(s.files, sb)
