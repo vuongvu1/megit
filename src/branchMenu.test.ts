@@ -42,8 +42,16 @@ describe('branchMenu', () => {
     ])
   })
 
-  it('gives a tag only copy actions', () => {
-    expect(labels(chip({ tag: true, name: 'v1.0' }), ctx())).toEqual(['Copy tag name', 'Copy GitHub link'])
+  it('gives a tag delete and copy actions, and none of the branch ones', () => {
+    expect(labels(chip({ tag: true, name: 'v1.0' }), ctx()))
+      .toEqual(['Delete tag', 'Copy tag name', 'Copy GitHub link'])
+  })
+
+  it('deletes a tag through deleteTag, never the branch delete', () => {
+    const run = vi.fn()
+    const items = branchMenu(chip({ tag: true, name: 'v1.0' }), ctx({ run }))
+    items[0].onClick()
+    expect(run).toHaveBeenCalledWith('deleteTag')
   })
 
   it('hides remote-dependent actions when the repo has none', () => {

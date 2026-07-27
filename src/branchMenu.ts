@@ -7,7 +7,7 @@ export type RefChip = { name: string; local: boolean; remote: boolean; tag: bool
 export type BranchAction =
   | 'checkout' | 'pull' | 'push' | 'upstream'
   | 'merge' | 'rebase'
-  | 'create' | 'rename' | 'delete'
+  | 'create' | 'rename' | 'delete' | 'deleteTag'
   | 'copyName' | 'copyLink'
 
 export type BranchCtx = {
@@ -26,7 +26,8 @@ export function branchMenu(chip: RefChip, { current, hasRemote, canLink, run }: 
     items.push({ label, onClick: () => run(action), ...extra })
 
   if (chip.tag) {
-    add('Copy tag name', 'copyName')
+    add('Delete tag', 'deleteTag', { danger: true })
+    add('Copy tag name', 'copyName', { sep: true })
     if (canLink) add('Copy GitHub link', 'copyLink')
     return items
   }

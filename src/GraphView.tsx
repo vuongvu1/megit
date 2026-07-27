@@ -421,6 +421,12 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
             .catch((err: Error) => alert(`Delete branch failed:\n${err.message}`)))
           return
         }
+        case 'deleteTag':
+          // no unmerged-work dance: deleting a tag only drops the label, and unlike a
+          // branch git never refuses it — one confirm is the whole safety net
+          if (confirm(`Delete tag ${chip.name}?\n\nThe local tag only — a tag already pushed stays on the remote.`))
+            branchApi({ action: 'deleteTag', tag: chip.name }, 'Delete tag')
+          return
         case 'copyName': return void navigator.clipboard.writeText(chip.name)
         case 'copyLink': return void navigator.clipboard.writeText(`${githubUrl}/${chip.tag ? 'releases/tag' : 'tree'}/${chip.name}`)
       }

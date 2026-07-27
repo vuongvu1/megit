@@ -388,6 +388,13 @@ app.post('/api/branch', repoGuard, async (req, res) => {
         await git(repo, ['branch', req.body.force === true ? '-D' : '-d', branch])
         break
       }
+      case 'deleteTag': {
+        // ponytail: local tag only — the graph's chips come from local refs, so a
+        // remote tag would need `push --delete`, a network action nobody asked for
+        const tag = mustExist(await knownRefs(repo, 'refs/tags'), req.body.tag, 'tag')
+        await git(repo, ['tag', '-d', tag])
+        break
+      }
       case 'merge':
       case 'rebase': {
         const branch = mustExist(await locals(), req.body.branch, 'branch')
