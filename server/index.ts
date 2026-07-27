@@ -2,8 +2,9 @@ import express from 'express'
 import type { RequestHandler } from 'express'
 import { execFile } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
+import { readFile, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { parseBranchHeader, parseLog, parseMeta, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
@@ -653,6 +654,74 @@ app.get('/api/diff', repoGuard, async (req, res) => {
     res.json({ diff })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
+  }
+})
+
+// raw bytes of one blob, for rendering image diffs as two <img>. `which` picks
+// the before/after side; a missing blob (added or deleted file) is a 404 the
+// client renders as an empty pane.
+const MIME: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  webp: 'image/webp', svg: 'image/svg+xml', avif: 'image/avif', ico: 'image/x-icon', bmp: 'image/bmp',
+}
+
+function gitBuf(repo: string, args: string[]): Promise<Buffer> {
+  return new Promise((res, rej) => {
+    execFile('git', ['-C', repo, ...args], { maxBuffer: 50 * 1024 * 1024, env: GIT_ENV, encoding: 'buffer' }, (err, stdout, stderr) => {
+      if (err) rej(new Error(stderr.toString().trim() || err.message))
+      else res(stdout)
+    })
+  })
+}
+
+app.get('/api/blob', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const hash = req.query.hash ? String(req.query.hash) : null
+  const file = String(req.query.file ?? '')
+  const side = String(req.query.side ?? '')
+  const old = req.query.which === 'old'
+  if (hash !== null && !isSha(hash)) {
+    res.status(400).json({ error: 'invalid hash' })
+    return
+  }
+  const mime = MIME[file.split('.').pop()?.toLowerCase() ?? '']
+  if (!mime) {
+    res.status(400).json({ error: 'unsupported file type' })
+    return
+  }
+  try {
+    let buf: Buffer
+    if (hash) {
+      const rev = old ? await firstParent(repo, hash) : hash
+      if (!rev) {
+        res.status(404).end()
+        return
+      }
+      buf = await gitBuf(repo, ['show', `${rev}:${file}`])
+    } else if (old) {
+      // staged pane compares against HEAD; unstaged compares against the index
+      buf = await gitBuf(repo, ['show', `${side === 'worktree' ? '' : 'HEAD'}:${file}`])
+    } else if (side === 'staged') {
+      buf = await gitBuf(repo, ['show', `:${file}`])
+    } else {
+      // worktree content isn't in any git object — read it off disk, but only
+      // from inside the (already guarded) repo
+      // realpath, not resolve: a cloned repo can contain a symlink pointing
+      // outside itself, and git will happily materialize it on checkout
+      const abs = await realpath(resolve(repo, file))
+      const root = await realpath(repo)
+      if (!abs.startsWith(root + sep)) {
+        res.status(400).json({ error: 'path outside repo' })
+        return
+      }
+      buf = await readFile(abs)
+    }
+    // repo content is untrusted (an SVG can carry script); <img> never runs it,
+    // but a direct navigation to this URL would — sandbox it either way
+    res.set('Content-Security-Policy', "sandbox; default-src 'none'").set('X-Content-Type-Options', 'nosniff')
+    res.type(mime).send(buf)
+  } catch {
+    res.status(404).end()
   }
 })
 

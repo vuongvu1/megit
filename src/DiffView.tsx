@@ -7,6 +7,24 @@ import { useTheme } from './theme'
 
 type DiffResp = { diff?: string; tooLarge?: boolean; size?: number }
 
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|avif|ico|bmp)$/i
+
+// One side of an image diff. The blob endpoint 404s when the file didn't exist
+// on that side (added/deleted), which <img> reports as a load error.
+function ImagePane({ src, label }: { src: string; label: string }) {
+  const [missing, setMissing] = useState(false)
+  const [dims, setDims] = useState('')
+  useEffect(() => { setMissing(false); setDims('') }, [src])
+  return (
+    <div className={`image-pane${missing ? ' missing' : ''}`}>
+      <div className="image-pane-label">{label}{dims && <span> · {dims}</span>}</div>
+      {missing
+        ? <div className="image-pane-none">absent</div>
+        : <img src={src} onError={() => setMissing(true)} onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)} />}
+    </div>
+  )
+}
+
 export default function DiffView({ repo, hash, file, side, wipTick }: { repo: string; hash: string | null; file: string; side?: 'staged' | 'worktree'; wipTick: number }) {
   const [resp, setResp] = useState<DiffResp | null>(null)
   const [error, setError] = useState('')
@@ -14,7 +32,10 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
   const theme = useTheme()
   const ref = useRef<HTMLDivElement>(null)
 
+  const isImage = IMAGE_RE.test(file)
+
   const load = (force = false, silent = false) => {
+    if (isImage) return
     if (!silent) {
       setError('')
       setResp(null)
@@ -49,6 +70,21 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
     ui.draw()
     ui.highlightCode()
   }, [resp, split, plain, theme])
+
+  if (isImage) {
+    const q = (which: 'old' | 'new') => {
+      const p = new URLSearchParams({ repo, file, which, ...(hash ? { hash } : { t: String(wipTick) }), ...(side ? { side } : {}) })
+      return `/api/blob?${p}`
+    }
+    return (
+      <div className="diffview">
+        <div className="image-diff">
+          <ImagePane src={q('old')} label="Before" />
+          <ImagePane src={q('new')} label="After" />
+        </div>
+      </div>
+    )
+  }
 
   if (error) return <div className="diffview error">{error}</div>
   if (!resp) return <div className="diffview empty">Loading…</div>

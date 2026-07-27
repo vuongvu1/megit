@@ -239,6 +239,17 @@ button:hover { background: var(--border); }
 .diff-html .d2h-file-diff { overflow-x: auto; }
 .diff-html .d2h-diff-table { font-family: 'Ubuntu Mono', ui-monospace, monospace; }
 .diff-plain { padding: 10px; color: var(--fg-dim); }
+.image-diff { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; overflow: auto; align-content: start; }
+.image-pane { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.image-pane-label { font-size: 12px; color: var(--fg-dim); }
+.image-pane img {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  /* checkerboard so transparent PNGs read as transparent, not as background */
+  background: repeating-conic-gradient(var(--bg-panel) 0% 25%, var(--bg) 0% 50%) 0 0 / 16px 16px;
+}
+.image-pane-none { padding: 20px; text-align: center; color: var(--fg-dim); border: 1px dashed var(--border); border-radius: 4px; }
 /* GitHub (Primer) diff palette */
 .d2h-wrapper {
   --d2h-bg-color: var(--bg-panel);
