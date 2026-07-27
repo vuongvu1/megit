@@ -249,6 +249,13 @@ button:hover { background: var(--border); }
 .diff-html .d2h-file-wrapper { position: relative; }
 .diff-html .d2h-file-diff { overflow-x: auto; }
 .diff-html .d2h-diff-table { font-family: 'Ubuntu Mono', ui-monospace, monospace; }
+/* d2h ships cursor:pointer on line numbers; nothing is clickable there */
+.diff-html .d2h-code-linenumber, .diff-html .d2h-code-side-linenumber { cursor: default; }
+/* gap expanders live in the hunk-header gutter, which d2h positions absolutely,
+   so they add no row height (side-by-side alignment stays intact) */
+.diff-html td.d2h-info .diff-expand-group { display: flex; direction: ltr; gap: 1px; padding-left: 2px; }
+.diff-html .diff-expand { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 3px; background: none; color: var(--fg-dim); cursor: pointer; }
+.diff-html .diff-expand:hover { background: var(--bg-hover); color: var(--fg); }
 .diff-plain { padding: 10px; color: var(--fg-dim); }
 .image-diff { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; overflow: auto; align-content: start; }
 .image-pane { display: flex; flex-direction: column; gap: 6px; min-width: 0; }

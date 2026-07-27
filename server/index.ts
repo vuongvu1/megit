@@ -634,22 +634,25 @@ app.get('/api/diff', repoGuard, async (req, res) => {
     res.status(400).json({ error: 'invalid hash' })
     return
   }
+  // `context` widens -U so the client can expand hunk gaps from one response
+  const n = Number(req.query.context)
+  const ctx = Number.isInteger(n) && n > 0 ? [`-U${Math.min(n, 1e6)}`] : []
   try {
     let diff: string
     if (hash) {
       const parent = await firstParent(repo, hash)
       diff = parent
-        ? await git(repo, ['diff', parent, hash, '--', file])
-        : await git(repo, ['show', '--format=', hash, '--', file])
+        ? await git(repo, ['diff', ...ctx, parent, hash, '--', file])
+        : await git(repo, ['show', '--format=', ...ctx, hash, '--', file])
     } else if (req.query.side === 'staged') {
       // HEAD vs index only — the merged HEAD-vs-worktree diff below would be empty
       // for a file that's fully staged, and misleading for a partially staged one
-      diff = await git(repo, ['diff', '--cached', '--', file])
+      diff = await git(repo, ['diff', '--cached', ...ctx, '--', file])
     } else {
       // index vs worktree for the unstaged side, HEAD vs worktree when no side is given
-      diff = await git(repo, ['diff', ...(req.query.side === 'worktree' ? [] : ['HEAD']), '--', file])
+      diff = await git(repo, ['diff', ...ctx, ...(req.query.side === 'worktree' ? [] : ['HEAD']), '--', file])
       // untracked file: not in HEAD diff; --no-index exits 1 when files differ
-      if (!diff.trim()) diff = await git(repo, ['diff', '--no-index', '--', '/dev/null', file], [0, 1])
+      if (!diff.trim()) diff = await git(repo, ['diff', '--no-index', ...ctx, '--', '/dev/null', file], [0, 1])
     }
     if (req.query.force !== '1' && diff.length > DIFF_CAP) {
       res.json({ tooLarge: true, size: diff.length })
