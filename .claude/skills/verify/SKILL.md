@@ -10,9 +10,13 @@ Node ≥ 24 required (native TS type-stripping). With nvm: `export PATH="$HOME/.
 ## Build + launch (production surface)
 
 ```bash
-pnpm build                                   # vite → dist/
-node server/index.ts &                       # serves dist/ + API on http://127.0.0.1:3411
+pnpm build                                            # vite → dist/
+node server/index.ts & echo $! > /tmp/megit-verify.pid   # serves dist/ + API on http://127.0.0.1:3411
 ```
+
+When done, kill **only that PID**: `kill $(cat /tmp/megit-verify.pid)`.
+
+**Never `pkill -f "node server/index.ts"`** — the pattern also matches the child process of the user's `node --watch server/index.ts` (their running `pnpm dev`). Killing it leaves their watcher stuck at "Failed running 'server/index.ts'. Waiting for file changes before restarting..." until they restart the app by hand.
 
 Server only mounts `dist/` static serving if it exists **at startup** — restart after first build. Frontend changes need `pnpm build` + hard reload (hashed asset names, no cache issue).
 
