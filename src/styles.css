@@ -214,8 +214,7 @@ button:hover { background: var(--border); }
 .person-when { color: var(--fg-dim); font-size: 12px; }
 .face { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
 .face-fallback { display: inline-flex; align-items: center; justify-content: center; background: var(--bg-hover); color: var(--fg-dim); font-size: 11px; }
-.commit-hash { position: absolute; top: 10px; right: 12px; color: var(--fg-faint); font-family: 'Ubuntu Mono', ui-monospace, monospace; font-size: 12px; cursor: pointer; }
-.commit-hash:hover { color: var(--fg); }
+.commit-hash { position: absolute; top: 10px; right: 12px; color: var(--fg-faint); font-family: 'Ubuntu Mono', ui-monospace, monospace; font-size: 12px; }
 
 .files-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .files-counts { display: flex; gap: 10px; color: var(--fg-dim); font-size: 12px; white-space: nowrap; overflow: hidden; }
