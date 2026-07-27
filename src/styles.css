@@ -44,6 +44,10 @@ button:hover { background: var(--border); }
 .empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--fg-faint); }
 .error { color: #e06c75; padding: 8px; white-space: pre-wrap; }
 
+/* Above the .modal-backdrop (z-index 10) — a checkout started from a dialog can fail. */
+.toasts { position: fixed; bottom: 12px; right: 12px; z-index: 20; display: flex; flex-direction: column; gap: 6px; max-width: 380px; }
+.toast { padding: 8px 10px; border-radius: 6px; background: var(--bg-panel); border: 1px solid #e06c75; border-left-width: 3px; color: var(--fg); white-space: pre-wrap; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); animation: appear .15s ease-out; }
+
 .tabbar { display: flex; gap: 2px; background: var(--bg-tabbar); padding: 6px 6px 0; flex-shrink: 0; }
 .logo { width: 18px; height: 18px; align-self: center; margin: 0 4px 6px 2px; pointer-events: none; }
 .tab { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px 6px 0 0; background: var(--bg-tab); cursor: pointer; }

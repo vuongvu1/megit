@@ -3,6 +3,7 @@ import { api, jsonInit } from './api'
 import TabBar from './TabBar'
 import DirBrowser from './DirBrowser'
 import RepoView from './RepoView'
+import Toasts from './Toast'
 
 export type Config = { repos: string[]; activeRepo: string | null }
 
@@ -61,6 +62,7 @@ export default function App() {
           </Boundary>
         )
         : <div className="empty">No repository open — add one with “+”</div>}
+      <Toasts />
     </div>
   )
 }

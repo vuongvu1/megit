@@ -7,6 +7,7 @@ import { commitMenu } from './commitMenu'
 import { layout, stashSlot, activeTrail, type LaneRow, type TrailRow } from './lanes'
 import { rowOrder, sameRow, step } from './rowNav'
 import type { Selection } from './RepoView'
+import { toastErr } from './Toast'
 import { useAvatar, initials } from './avatar'
 
 const ROW = 28
@@ -306,7 +307,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
   }
   const stashApi = (body: object, label: string) =>
     onBusy(api(`/api/stash?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
-      .catch(err => alert(`Stash ${label} failed:\n${(err as Error).message}`)))
+      .catch(err => toastErr(`Stash ${label} failed:\n${(err as Error).message}`)))
   // pop drops the stash too, but its content lands in the worktree where the user
   // can see (and re-stash) it — delete is the one that leaves nothing behind, so
   // it's the only one that confirms
@@ -332,7 +333,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
   const branchPost = (body: object) =>
     api(`/api/branch?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
   const branchApi = (body: object, label: string) =>
-    onBusy(branchPost(body).catch(err => alert(`${label} failed:\n${(err as Error).message}`)))
+    onBusy(branchPost(body).catch(err => toastErr(`${label} failed:\n${(err as Error).message}`)))
   const checkout = (branch: string) => {
     type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number }
     const post = (body: object) =>
@@ -347,12 +348,12 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
         )
         if (ok) return post({ branch, reset: true })
       })
-      .catch(err => alert(`Checkout failed:\n${(err as Error).message}`))) // ponytail: alert; inline toast if it grates
+      .catch(err => toastErr(`Checkout failed:\n${(err as Error).message}`)))
   }
   const commitPost = (body: object) =>
     api(`/api/commit?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
   const commitApi = (body: object, label: string) =>
-    onBusy(commitPost(body).catch(err => alert(`${label} failed:\n${(err as Error).message}`)))
+    onBusy(commitPost(body).catch(err => toastErr(`${label} failed:\n${(err as Error).message}`)))
   const newBranchAt = (hash: string) => {
     const name = prompt(`New branch at ${hash.slice(0, 7)}`, '')
     if (name) branchApi({ action: 'create', name, at: hash }, 'Create branch')
@@ -418,7 +419,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
               if (!/not fully merged/.test(err.message)) throw err
               if (confirm(`${chip.name} is not fully merged.\n\nDelete anyway? Its commits stay reachable only through the reflog.`)) return del(true)
             })
-            .catch((err: Error) => alert(`Delete branch failed:\n${err.message}`)))
+            .catch((err: Error) => toastErr(`Delete branch failed:\n${err.message}`)))
           return
         }
         case 'deleteTag':

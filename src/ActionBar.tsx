@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { BranchHeader, Commit, StashEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
 import { toolbar, type ToolbarAction } from './toolbar'
+import { toastErr } from './Toast'
 
 // same 16-grid, 1.5-stroke glyphs as the commit panel's icons
 const icon = (d: string) => () => (
@@ -63,11 +64,11 @@ export default function ActionBar({ repo, commits, branch, remotes, stashes, dir
     [commits],
   )
 
-  // ponytail: post-and-alert runner duplicated from GraphView. Two copies beat
+  // ponytail: post-and-toast runner duplicated from GraphView. Two copies beat
   // hoisting a shared abstraction; extract when a third appears.
   const post = (path: string, body: object, label: string) =>
     onBusy(api(`/api/${path}?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
-      .catch(err => alert(`${label} failed:\n${(err as Error).message}`)))
+      .catch(err => toastErr(`${label} failed:\n${(err as Error).message}`)))
 
   const run = (action: ToolbarAction) => {
     switch (action) {
