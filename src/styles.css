@@ -106,13 +106,25 @@ button:hover { background: var(--border); }
 
 .graph-pane { position: relative; width: var(--graph-w, 55%); flex-shrink: 0; display: flex; flex-direction: column; min-width: 0; }
 .graphview { flex: 1; overflow: auto; padding-bottom: 8px; }
+/* Offscreen rows skip layout and paint: at 1000 loaded rows a full relayout of the
+   list (splitter drag, theme switch, --refs-w change) went 19.9ms → 4.2ms. The
+   intrinsic size is the exact row height, so the scrollbar doesn't estimate and
+   nothing jumps. Not on .row.wip — it's the sticky row, always on screen.
+   ponytail: this is the whole of the "virtualize the list" job. It does nothing for
+   the ~150ms React reconcile on Load more, but that number is flat from 200 to 1400
+   rows, so it's the cost of the 100 new rows, not of the old ones — a virtualizer
+   would rewrite GraphView to buy back almost none of it. Revisit only if reconcile
+   time starts scaling with list length. */
+.graphview .row:not(.wip) { content-visibility: auto; contain-intrinsic-size: auto 28px; }
 .diff-overlay { position: absolute; inset: 0; z-index: 2; background: var(--bg-panel); display: flex; flex-direction: column; }
 .diff-overlay-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .diff-overlay-head .file-path { flex: 1; }
 .diff-close { border: none; background: none; padding: 0 4px; font-size: 14px; }
 .splitter { width: 5px; flex-shrink: 0; cursor: col-resize; background: var(--border); background-clip: padding-box; border: 2px solid transparent; touch-action: none; }
 .splitter:hover, .splitter:active { background-color: #5a80b0; }
-.row { position: relative; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
+/* scroll-margin-top = row height: arrow-key navigation scrolls a row into view, and
+   without it the sticky WIP row covers whatever lands at the top edge */
+.row { position: relative; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; cursor: pointer; white-space: nowrap; scroll-margin-top: 28px; }
 /* wip tint skips the refs column like hover/selected below; opaque panel background-color keeps the sticky row from showing rows scrolling beneath */
 .row.wip { position: sticky; top: 0; background-color: var(--bg-panel); background-image: linear-gradient(to right, transparent calc(8px + var(--refs-w, 120px)), var(--bg-wip) 0); z-index: 1; font-style: italic; }
 /* highlight skips the refs column (hard-stop gradient after 8px padding + refs width); declared after .row.wip so hover/selected gradients win on wip rows too */

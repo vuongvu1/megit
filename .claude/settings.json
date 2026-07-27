@@ -10,6 +10,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null || exit 0; f=$(git ls-files --others --exclude-standard -z -- \"*.png\" 2>/dev/null | tr \"\\0\" \"\\n\" | grep -v \"/\"); [ -z \"$f\" ] && exit 0; printf \"%s\\n\" \"$f\" | while IFS= read -r p; do rm -f -- \"$p\"; done; printf \"{\\\"systemMessage\\\":\\\"Removed stray PNG: %s\\\"}\\n\" \"$(printf \"%s\" \"$f\" | tr \"\\n\" \" \")\"",
+            "statusMessage": "Cleaning up stray screenshots"
+          }
+        ]
+      }
     ]
   }
 }

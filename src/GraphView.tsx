@@ -1,10 +1,11 @@
-import { Fragment, memo, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
 import ContextMenu, { type MenuItem } from './ContextMenu'
 import { branchMenu, type RefChip } from './branchMenu'
 import { commitMenu } from './commitMenu'
 import { layout, stashSlot, activeTrail, type LaneRow, type TrailRow } from './lanes'
+import { rowOrder, sameRow, step } from './rowNav'
 import type { Selection } from './RepoView'
 import { useAvatar, initials } from './avatar'
 
@@ -187,7 +188,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   const chips = useMemo(() => parseRefs(c.refs, remotes), [c.refs, remotes])
   const isHead = chips.some(ch => ch.head)
   return (
-    <div className={`row${selected ? ' selected' : ''}`} onClick={onSelect} onContextMenu={e => onRowMenu(e, c.hash)}>
+    <div className={`row${selected ? ' selected' : ''}`} aria-current={selected || undefined} onClick={onSelect} onContextMenu={e => onRowMenu(e, c.hash)}>
       <span className="refs" onClick={e => e.stopPropagation()} onContextMenu={inert}>
         {chips.map(chip => {
           const canCheckout = !chip.head && !chip.tag && (chip.local || chip.remote)
@@ -252,7 +253,7 @@ function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSele
   const sc = color(lane)
   const solids = [...new Set([...passRow.incoming, ...passRow.through])]
   return (
-    <div className={`row stash${selected ? ' selected' : ''}`} onClick={onSelect} onContextMenu={onMenu}>
+    <div className={`row stash${selected ? ' selected' : ''}`} aria-current={selected || undefined} onClick={onSelect} onContextMenu={onMenu}>
       <span className="refs" onClick={e => e.stopPropagation()} onContextMenu={inert} />
       <span className="graph-col">
         <svg width={width} height={ROW} className="graph-cell">
@@ -458,6 +459,31 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
     return { byRow, lanes }
   }, [commits, rows, stashes, maxLanes, showWip, headIdx, wipLane])
   const width = Math.max(placements.lanes, 1) * COL
+
+  // Keyboard navigation. The listener is on the window, like RepoView's `r` and ⌘J,
+  // so the arrows work without clicking into the list first — but only while the
+  // graph is what the user last touched: focus inside the diff or the commit panel
+  // leaves the arrows to that pane's own scrolling. Nothing focused is the graph.
+  const listRef = useRef<HTMLDivElement>(null)
+  const order = useMemo(() => rowOrder(commits, placements.byRow, showWip), [commits, placements, showWip])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return // ⌘↓ is "scroll to bottom"
+      const t = e.target as HTMLElement
+      if (t !== document.body && !t.closest?.('.graphview')) return
+      const next = step(order.length, order.findIndex(o => sameRow(o, selection)), e.key)
+      if (next === null) return // no move: let the browser scroll instead
+      e.preventDefault()
+      onSelect(order[next])
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [order, selection, onSelect])
+  // follow the selection when a key moves it off screen; 'nearest' leaves an
+  // already-visible row where it is, so this is a no-op for clicks
+  useEffect(() => {
+    listRef.current?.querySelector('.row.selected')?.scrollIntoView({ block: 'nearest' })
+  }, [selection])
   // dotted overlays crossing commit row i: WIP → HEAD, plus each stash span insertIdx..endIdx
   const dashesFor = (i: number): Dash[] => {
     const out: Dash[] = showWip && headIdx >= 0 && i <= headIdx ? [{ lane: wipLane, end: i === headIdx }] : []
@@ -479,10 +505,11 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
   }
 
   return (
-    <div className="graphview">
+    <div className="graphview" ref={listRef}>
       {showWip && (
         <div
           className={`row wip${selection?.kind === 'wip' ? ' selected' : ''}`}
+          aria-current={selection?.kind === 'wip' || undefined}
           onClick={() => onSelect(selection?.kind === 'wip' ? null : { kind: 'wip' })}
           onContextMenu={e => openMenu(e, wipItems())}
         >
