@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import type { BranchHeader, Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api } from './api'
 import GraphView from './GraphView'
@@ -6,6 +6,9 @@ import type { DiffSide } from './wip'
 import CommitPanel from './CommitPanel'
 import ThemeSwitch from './ThemeSwitch'
 import ActionBar from './ActionBar'
+import SearchBar from './SearchBar'
+import { label, matchLocal, stepMatch } from './search'
+import { toastErr } from './Toast'
 
 // diff2html + highlight.js (~1 MB, 82% of the old main bundle) stay out until a
 // file is actually clicked; xterm.js + panel likewise until the terminal opens
@@ -61,6 +64,21 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
   const [refsW, setRefsW] = useState(() => Number(localStorage.getItem('megit-refs-w')) || 120)
   const [graphColW, setGraphColW] = useState(() => Number(localStorage.getItem('megit-graph-col')) || 90)
+  // 0 = closed; every ⌘F bumps it, which re-focuses and selects the input. One number
+  // instead of an `open` boolean plus a separate focus nonce.
+  const [searchSeq, setSearchSeq] = useState(0)
+  const [query, setQuery] = useState('')
+  const [cur, setCur] = useState(-1)
+  // null = local scope. Set by the deep button only, cleared by the next keystroke.
+  const [deep, setDeep] = useState<{ matches: string[]; truncated: boolean } | null>(null)
+  // declared up here, not beside the other search callbacks: the keydown effect below
+  // closes on it, and that effect is defined before them
+  const closeSearch = useCallback(() => {
+    setSearchSeq(0)
+    setQuery('')
+    setDeep(null)
+    setCur(-1)
+  }, [])
 
   const fps = useRef({ graph: '', status: '', head: '' })
   const loaded = useRef(0)
@@ -185,10 +203,17 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         e.preventDefault() // keep Chrome's downloads panel closed
         toggleTerm()
       }
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === 'KeyF') {
+        e.preventDefault() // and keep the browser's own find bar shut
+        setSearchSeq(s => s + 1)
+      }
+      // on the window, not the input: Esc has to close the bar even after focus moved
+      // to a row or the commit panel
+      if (e.key === 'Escape' && searchSeq > 0) closeSearch()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [refresh, toggleTerm])
+  }, [refresh, toggleTerm, searchSeq, closeSearch])
 
   // pointer capture keeps drag events on the splitter — no window listeners to clean up
   const onSplitDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -234,6 +259,65 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       })
       .catch(e => { if (g !== gen.current) return; setError({ msg: e.message, gone: false }) })
   }, [q, stashes])
+
+  // The default search scope. Derived, not stored: an SSE refresh replaces `commits` and
+  // this recomputes, so the count can't drift and a rebased-away hash can't go stale.
+  const localMatches = useMemo(() => matchLocal(commits, query), [commits, query])
+  const matches = deep?.matches ?? localMatches
+
+  // Selecting the match is the whole highlight: GraphView already styles .row.selected
+  // and scrolls it into view, so there is nothing to add there. `list` is a parameter
+  // rather than a read of `matches` because runDeep has to jump into a result set that
+  // hasn't reached state yet.
+  const jumpTo = useCallback((list: string[], i: number) => {
+    const hash = list[i]
+    setCur(hash ? i : -1)
+    if (!hash) return
+    if (commits.some(c => c.hash === hash)) {
+      setSelection({ kind: 'commit', hash })
+      return
+    }
+    // Below the loaded window. lanes.ts lays out top-down, so row N needs rows 0..N-1 —
+    // the only way down is to load more. Doubling gets there in a handful of growing
+    // requests instead of dozens of sequential `loadMore` pages.
+    const g = ++gen.current
+    void (async () => {
+      let limit = Math.max(loaded.current, PAGE)
+      while (limit < 5000) {
+        limit = Math.min(5000, limit * 2)
+        const res = await api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&limit=${limit}`)
+        if (g !== gen.current) return // superseded — a newer jump or refresh owns the list
+        setCommits(res.commits)
+        setHasMore(res.hasMore)
+        // both fingerprints, or the next silent refresh re-renders the whole list for nothing
+        fps.current.graph = graphFp(res.commits, res.hasMore, stashes)
+        fps.current.head = headFp(res.commits, stashes)
+        if (res.commits.some(c => c.hash === hash)) {
+          setSelection({ kind: 'commit', hash })
+          return
+        }
+      }
+      // 5000 is the server's cap, and far past where the DOM gives out
+      toastErr('Match is too deep in history to display')
+    })().catch(e => toastErr(e.message))
+  }, [commits, q, stashes])
+
+  const onQuery = useCallback((v: string) => {
+    setQuery(v)
+    setDeep(null) // a new query is a local query again
+    // matchLocal runs twice per keystroke (here and in the memo) — it's a lowercase +
+    // includes over the loaded rows, and this way the jump needs no effect to chase state
+    jumpTo(matchLocal(commits, v), 0)
+  }, [commits, jumpTo])
+
+  // One shot, not a mode: the only thing in this feature that spends a git process, and
+  // it spends it because the user asked.
+  const runDeep = useCallback(() => {
+    if (!query.trim()) return
+    api<{ matches: string[]; truncated: boolean }>(`/api/search?${q}&q=${encodeURIComponent(query)}`)
+      .then(r => { setDeep(r); jumpTo(r.matches, 0) })
+      .catch(e => toastErr(e.message))
+  }, [q, query, jumpTo])
 
   if (error) {
     return (
@@ -287,6 +371,19 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
       <div className="panes" style={{ '--graph-w': selection ? `${graphPct}%` : '100%' } as CSSProperties}>
         <div className={busy ? 'graph-pane busy' : 'graph-pane'} style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
           <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} githubUrl={githubUrl} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} />
+          {searchSeq > 0 && (
+            <SearchBar
+              seq={searchSeq}
+              value={query}
+              count={label(cur, matches.length, { truncated: deep?.truncated, deep: !!deep })}
+              deep={!!deep}
+              onChange={onQuery}
+              onDeep={runDeep}
+              onPrev={() => jumpTo(matches, stepMatch(matches.length, cur, -1))}
+              onNext={() => jumpTo(matches, stepMatch(matches.length, cur, 1))}
+              onClose={closeSearch}
+            />
+          )}
           <div className="col-splitter" style={{ left: refsW + 9 }} onPointerDown={onSplitDown} onPointerMove={onRefsMove} />
           <div className="col-splitter" style={{ left: refsW + graphColW + 17 }} onPointerDown={onSplitDown} onPointerMove={onGraphColMove} />
           {file && selection && (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseBranchHeader, parseLog, parseMeta, parseNameStatus, parseStatus, stashIndex } from './parse.ts'
+import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex } from './parse.ts'
 
 const F = '\x1f'
 const R = '\x1e'
@@ -148,5 +148,45 @@ describe('stashIndex', () => {
   it('returns -1 when the stash is gone', () => {
     expect(stashIndex(raw, 'ddd')).toBe(-1)
     expect(stashIndex('', 'aaa')).toBe(-1)
+  })
+})
+
+describe('parseMatches', () => {
+  it('reads %H\x1f%ct lines into hash/date pairs', () => {
+    expect(parseMatches(`aaa${F}300\nbbb${F}200\n`)).toEqual([['aaa', 300], ['bbb', 200]])
+  })
+
+  it('handles empty output', () => {
+    expect(parseMatches('')).toEqual([])
+    expect(parseMatches('\n')).toEqual([])
+  })
+})
+
+describe('mergeMatches', () => {
+  it('unions the lists and orders by commit date, newest first', () => {
+    const byMsg: [string, number][] = [['a', 300], ['c', 100]]
+    const byAuthor: [string, number][] = [['b', 200]]
+    expect(mergeMatches([byMsg, byAuthor]).matches).toEqual(['a', 'b', 'c'])
+  })
+
+  it('dedupes a commit that matched on more than one field', () => {
+    const byMsg: [string, number][] = [['a', 300]]
+    const byAuthor: [string, number][] = [['a', 300], ['b', 200]]
+    expect(mergeMatches([byMsg, byAuthor]).matches).toEqual(['a', 'b'])
+  })
+
+  it('caps at 500 and flags the truncation', () => {
+    const many: [string, number][] = Array.from({ length: 501 }, (_, i) => [`h${i}`, 1000 - i])
+    const res = mergeMatches([many])
+    expect(res.matches).toHaveLength(500)
+    expect(res.truncated).toBe(true)
+    expect(res.matches[0]).toBe('h0')
+  })
+
+  it('reports no truncation at exactly the cap, and handles empty input', () => {
+    const exact: [string, number][] = Array.from({ length: 500 }, (_, i) => [`h${i}`, 1000 - i])
+    expect(mergeMatches([exact]).truncated).toBe(false)
+    expect(mergeMatches([])).toEqual({ matches: [], truncated: false })
+    expect(mergeMatches([[], []])).toEqual({ matches: [], truncated: false })
   })
 })

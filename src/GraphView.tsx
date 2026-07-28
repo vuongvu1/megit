@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
 import ContextMenu, { type MenuItem } from './ContextMenu'
@@ -191,17 +191,20 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   return (
     <div className={`row${selected ? ' selected' : ''}`} aria-current={selected || undefined} onClick={onSelect} onContextMenu={e => onRowMenu(e, c.hash)}>
       <span className="refs" onClick={e => e.stopPropagation()} onContextMenu={inert}>
-        {/* group wrapper so chips split the cramped width equally instead of
-            shrinking proportionally — a head chip's icons are unshrinkable, so
-            proportional shrink eats its whole name first */}
+        {/* group wrapper so the chips split the cramped width between themselves —
+            without it .ref-line competes for the same free space */}
         <span className="ref-chips">
         {chips.map(chip => {
           const canCheckout = !chip.head && !chip.tag && (chip.local || chip.remote)
+          // icon count feeds the chip's flex-basis so every name gets the same
+          // number of pixels (see .ref-chip); icons are unshrinkable, so a chip
+          // that carries three of them would otherwise lose its whole name first
+          const nIcons = (chip.head ? 1 : 0) + (chip.tag ? 1 : 0) + (chip.local && !chip.tag ? 1 : 0) + (chip.remote ? 1 : 0)
           return (
           <span
             key={chip.name}
             className={`ref-chip${chip.head ? ' head' : ''}`}
-            style={{ borderColor: color(row.lane) }}
+            style={{ borderColor: color(row.lane), '--n-icons': nIcons } as CSSProperties}
             title={canCheckout ? `${chip.name} — double-click to checkout, right-click for actions` : `${chip.name} — right-click for actions`}
             onDoubleClick={canCheckout ? () => onCheckout(chip.name) : undefined}
             // a chip's menu replaces the row's — without this the row handler

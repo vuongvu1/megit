@@ -67,6 +67,33 @@ export function parseLog(raw: string): Commit[] {
     })
 }
 
+// `/api/search` asks git for `%H%x1f%ct` — the hash to select and the date to order by.
+export const parseMatches = (raw: string): [string, number][] =>
+  raw.split('\n').filter(Boolean).map(l => {
+    const [hash, ct] = l.split('\x1f')
+    return [hash, Number(ct)] as [string, number]
+  })
+
+// The graph will not render 14k rows, and a one-word query can match most of a
+// history, so the route reports a bounded slice.
+export const SEARCH_CAP = 500
+
+// git ANDs its commit-limiting options, so "message OR author OR hash" costs one
+// `git log` per field and a union here. Date-descending is the ordering the graph's
+// --date-order mostly agrees with.
+//
+// ponytail: ct-desc, not true --date-order — topological tie-breaks can disagree, so
+// "next" may occasionally step one row upward. Exact positions would cost a
+// full-history `--format=%H` pass per query; local search is already exact.
+export function mergeMatches(lists: [string, number][][]): { matches: string[]; truncated: boolean } {
+  const byHash = new Map<string, number>()
+  for (const list of lists) {
+    for (const [hash, ct] of list) if (!byHash.has(hash)) byHash.set(hash, ct)
+  }
+  const sorted = [...byHash].sort((a, b) => b[1] - a[1]).map(([hash]) => hash)
+  return { matches: sorted.slice(0, SEARCH_CAP), truncated: sorted.length > SEARCH_CAP }
+}
+
 // `stash@{N}` is positional and renumbers on every stash push/drop, so a stash
 // action must map its sha to an index against a list read at action time — an
 // index captured when the graph loaded can address a different stash by now.

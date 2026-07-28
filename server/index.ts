@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import { loadConfig, saveConfig, isPermutation } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
-import { parseBranchHeader, parseLog, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
+import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal } from './term.ts'
 
@@ -174,6 +174,46 @@ app.get('/api/graph', repoGuard, async (req, res) => {
       return
     }
     res.status(500).json({ error: msg })
+  }
+})
+
+// The graph's ref whitelist, repeated rather than shared: the two lists must agree, and
+// a comment is cheaper than a seam. A search hit must be a commit the graph can show.
+const SEARCH_TIPS = ['HEAD', '--branches', '--tags', '--remotes']
+
+// Opt-in path only — the client filters its loaded rows for free and reaches here just
+// when the user clicks "search all history".
+app.get('/api/search', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const q = String(req.query.q ?? '').trim()
+  // an empty query is not a search: answer without touching git
+  if (!q) {
+    res.json({ matches: [], truncated: false })
+    return
+  }
+  // -F: a typed '.', '(' or '*' is a literal (verified on git 2.50.1 for --grep and
+  //     --author alike). Without it a query holding '(' exits non-zero, and the regex
+  //     engine's worst case becomes the client's to pick.
+  // -i: covers --grep and --author alike.
+  // --max-count=501: q='a' matches most of a 14k history; 500 is all this reports, and
+  //     the 501st row is what proves there were more.
+  const scan = (pattern: string) =>
+    git(repo, ['log', ...SEARCH_TIPS, '--date-order', '-i', '-F', pattern, '--max-count=501', '--format=%H%x1f%ct'])
+      .then(parseMatches)
+      .catch(() => [] as [string, number][])
+  try {
+    const [byMsg, byAuthor, byHash] = await Promise.all([
+      scan(`--grep=${q}`),
+      scan(`--author=${q}`),
+      // `--` terminates revs: without it an abbreviated sha that is also a filename is
+      // ambiguous. An unknown or ambiguous prefix exits non-zero → no hash match.
+      isSha(q)
+        ? git(repo, ['log', '-1', '--format=%H%x1f%ct', q, '--']).then(parseMatches).catch(() => [] as [string, number][])
+        : Promise.resolve([] as [string, number][]),
+    ])
+    res.json(mergeMatches([byMsg, byAuthor, byHash]))
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message })
   }
 })
 
