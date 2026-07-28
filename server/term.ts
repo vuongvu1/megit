@@ -1,7 +1,21 @@
 import type { Server } from 'node:http'
 import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { WebSocketServer, WebSocket } from 'ws'
 import { loadConfig } from './config.ts'
+
+// node-pty is an optionalDependency: it ships prebuilds for darwin and win32 only,
+// so a Linux install either compiles from source or omits the package entirely.
+// resolve() answers "is it installed?" without executing the native binding — the
+// lazy import in getSession() stays lazy, and /api/config stays cheap.
+export function hasPty(): boolean {
+  try {
+    createRequire(import.meta.url).resolve('node-pty')
+    return true
+  } catch {
+    return false
+  }
+}
 
 // One live shell per repo. Created on first attach (node-pty loads lazily then),
 // survives panel hide/tab switch — the socket detaches but the PTY keeps running,
@@ -55,7 +69,15 @@ async function getSession(repo: string): Promise<Session> {
 }
 
 async function attach(repo: string, ws: WebSocket) {
-  const s = await getSession(repo)
+  let s: Session
+  try {
+    s = await getSession(repo)
+  } catch {
+    // resolve() said the package is there but the native binding failed to load
+    ws.send('\r\n[terminal unavailable: node-pty could not be loaded on this platform]\r\n')
+    ws.close()
+    return
+  }
   s.clients.add(ws)
   if (s.buffer.length) ws.send(s.buffer.join(''))
   ws.on('message', raw => {
@@ -79,6 +101,6 @@ export function wireTerminal(server: Server) {
     if (origin && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) { socket.destroy(); return }
     const repo = url.searchParams.get('repo') ?? ''
     if (!loadConfig().repos.includes(repo) || !existsSync(repo)) { socket.destroy(); return }
-    wss.handleUpgrade(req, socket, head, ws => { attach(repo, ws) })
+    wss.handleUpgrade(req, socket, head, ws => { void attach(repo, ws) })
   })
 }

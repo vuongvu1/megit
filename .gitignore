@@ -1,5 +1,9 @@
 node_modules
 dist
+dist-server
+.packtest
+.screenshot-home
+*.tgz
 .e2e-probe
 .playwright-mcp
 test-repo

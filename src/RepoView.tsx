@@ -43,7 +43,7 @@ const statusFp = (files: StatusEntry[], b: BranchHeader) =>
 
 const NO_BRANCH: BranchHeader = { head: null, upstream: null, ahead: 0, behind: 0 }
 
-export default function RepoView({ repo, onRemove }: { repo: string; onRemove: () => void }) {
+export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string; onRemove: () => void; hasTerminal: boolean }) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [remotes, setRemotes] = useState<string[]>([])
@@ -60,7 +60,10 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
   const [busy, setBusy] = useState(false)
   const inflight = useRef(false)
   const [termOpen, setTermOpen] = useState(() => termOpenByRepo.get(repo) ?? false)
-  const toggleTerm = useCallback(() => setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o }), [repo])
+  const toggleTerm = useCallback(() => {
+    if (!hasTerminal) return
+    setTermOpen(o => { termOpenByRepo.set(repo, !o); return !o })
+  }, [repo, hasTerminal])
   const [graphPct, setGraphPct] = useState(() => Number(localStorage.getItem('megit-split')) || 55)
   const [refsW, setRefsW] = useState(() => Number(localStorage.getItem('megit-refs-w')) || 120)
   const [graphColW, setGraphColW] = useState(() => Number(localStorage.getItem('megit-graph-col')) || 90)
@@ -354,17 +357,19 @@ export default function RepoView({ repo, onRemove }: { repo: string; onRemove: (
         </div>
         <ActionBar repo={repo} commits={commits} branch={branch} remotes={remotes} stashes={stashes} dirty={status.length > 0} onBusy={spinWhile} />
         <div className="tb-right">
-          <button
-            className={`term-btn${termOpen ? ' active' : ''}`}
-            onClick={toggleTerm}
-            title="Toggle terminal (⌘J)"
-            aria-label="Toggle terminal"
-          >
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 17l6-5-6-5" />
-              <path d="M12 19h8" />
-            </svg>
-          </button>
+          {hasTerminal && (
+            <button
+              className={`term-btn${termOpen ? ' active' : ''}`}
+              onClick={toggleTerm}
+              title="Toggle terminal (⌘J)"
+              aria-label="Toggle terminal"
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 17l6-5-6-5" />
+                <path d="M12 19h8" />
+              </svg>
+            </button>
+          )}
           <ThemeSwitch />
         </div>
       </div>

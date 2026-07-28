@@ -8,30 +8,9 @@ importers:
 
   .:
     dependencies:
-      '@xterm/addon-fit':
-        specifier: ^0.11.0
-        version: 0.11.0
-      '@xterm/xterm':
-        specifier: ^6.0.0
-        version: 6.0.0
-      diff2html:
-        specifier: ^3.4.56
-        version: 3.4.56
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@10.2.2)
-      highlight.js:
-        specifier: ^11.11.1
-        version: 11.11.1
-      node-pty:
-        specifier: ^1.1.0
-        version: 1.1.0
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
       ws:
         specifier: ^8.21.1
         version: 8.21.1
@@ -54,9 +33,27 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.4
         version: 6.0.4(vite@8.1.5(@types/node@26.1.1))
+      '@xterm/addon-fit':
+        specifier: ^0.11.0
+        version: 0.11.0
+      '@xterm/xterm':
+        specifier: ^6.0.0
+        version: 6.0.0
       concurrently:
         specifier: ^10.0.4
         version: 10.0.4
+      diff2html:
+        specifier: ^3.4.56
+        version: 3.4.56
+      highlight.js:
+        specifier: ^11.11.1
+        version: 11.11.1
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -66,6 +63,10 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@26.1.1)(vite@8.1.5(@types/node@26.1.1))
+    optionalDependencies:
+      node-pty:
+        specifier: ^1.1.0
+        version: 1.1.0
 
 packages:
 
@@ -1639,11 +1640,13 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  node-addon-api@7.1.1: {}
+  node-addon-api@7.1.1:
+    optional: true
 
   node-pty@1.1.0:
     dependencies:
       node-addon-api: 7.1.1
+    optional: true
 
   nopt@1.0.10:
     dependencies:

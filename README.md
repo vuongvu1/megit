@@ -1,48 +1,151 @@
 # <img src="public/logo.svg" width="28"/> megit
 
-Git repository viewer in the browser: commit graph with branch lanes, stashes, tabs for multiple repos, and diffs (unified or side-by-side) — including your uncommitted WIP. It also writes: stage/unstage/discard, commit and amend, branch and tag create/delete, stash push/pop/drop, checkout (with auto-stash when the worktree is dirty), plus revert, reset, cherry-pick, merge, rebase, pull and push.
+A git repository viewer that runs in your browser. Commit graph with real branch lanes, diffs including your uncommitted work, stashes, staging, search, and a shell — pointed at as many local repos as you like, each in its own tab.
 
-![megit — commit graph with branch lanes, stash and WIP rows](docs/screenshot.png)
+It writes, too: stage/unstage/discard, commit and amend, branch and tag create/delete, stash push/pop/drop, checkout (with auto-stash when the worktree is dirty), plus revert, reset, cherry-pick, merge, rebase, pull and push.
 
-## Requirements
+Nothing leaves your machine: the server binds `127.0.0.1`, shells out to your own `git`, and has no account, telemetry, or network dependency beyond optional Gravatar avatars.
 
-- Node ≥ 24 (runs TypeScript directly via native type-stripping)
-- pnpm
+![megit — commit graph with branch lanes, stash rows and the sticky WIP row](docs/graph-dark.png)
 
-## Run
+## Install
+
+Requires Node ≥ 24.
+
+```bash
+npx megit-app              # reopen your last session
+npx megit-app ~/code/repo  # open a repository straight away
+```
+
+Installed globally (`npm i -g megit-app`), the command is just `megit`.
+
+`PORT` picks the port (default 3411). The server opens your browser at it.
+
+## Features
+
+### Commit graph with lanes
+
+Branches get their own colour and lane. The checked-out branch's path is drawn thicker so you can follow it at a glance, and merges bulge around the lanes they cross instead of cutting through them. Commits page in 100 at a time and load more on demand, so opening a repository never waits on the full history.
+
+Ref chips sit in their own resizable column to the left — local branches, remotes, and tags — and the graph column and message column can be dragged to whatever widths suit the repo.
+
+### Light and dark themes
+
+Toggle with the switch in the toolbar or <kbd>⌘</kbd><kbd>⇧</kbd><kbd>0</kbd>. The choice persists.
+
+![megit in the light theme](docs/graph-light.png)
+
+### Uncommitted work is part of the graph
+
+A sticky WIP row sits at the top of the list whenever the worktree is dirty, connected into HEAD like any other node. Click it to stage, unstage, or discard individual files, write a message, and commit — staged and unstaged changes are separate collapsible sections with counts.
+
+![the WIP row expanded into staged and unstaged sections with a commit composer](docs/wip-staging.png)
+
+Stashes appear as their own rows, attached to the commit they were taken from with a dotted connector, and can be popped, deleted, or retitled in place.
+
+### Diffs
+
+Click a commit to see its changed files, then a file to see the diff. Syntax highlighting, word-level intra-line highlighting, collapsed context you can expand a hunk at a time, and a per-file "Viewed" checkbox.
+
+**Unified:**
+
+![unified diff with an expandable hunk gap](docs/diff-unified.png)
+
+**Split**, side by side:
+
+![split diff with word-level highlighting](docs/diff-side-by-side.png)
+
+Merge commits diff against their first parent. Images diff visually rather than as binary noise. Untracked files diff too, via `git diff --no-index`.
+
+### Commit detail
+
+Author and committer are shown separately when they differ — including the dates, which is the bit most tools hide. The changed-file list toggles between a flat path list and a directory tree.
+
+![commit detail panel showing author, committer and changed files](docs/commit-detail.png)
+
+### Search
+
+<kbd>⌘</kbd><kbd>F</kbd> opens a find bar that filters the rows already loaded, as you type — matching commit message, author name, email, hash prefix, or ref name. That costs no request and can't go stale when the graph refreshes underneath you. <kbd>↵</kbd> and <kbd>⇧</kbd><kbd>↵</kbd> walk the matches, wrapping at the ends the way a find bar should.
+
+If what you want is further back than the rows you've loaded, the globe button re-runs the same query as a full-history `git log` search. Because git ANDs its commit-limiting options, "message OR author OR hash" is three searches unioned into one date-ordered list, capped at 500 results — the counter shows `12 of 340 · all`, with a `+` when the cap truncated it. A match below the loaded window pulls the graph down to it.
+
+### A real shell, in the repo
+
+<kbd>⌘</kbd><kbd>J</kbd> opens a full PTY already `cd`'d into the active repository — your shell, your prompt, your aliases. It survives panel hides and tab switches, and <kbd>⌘</kbd><kbd>K</kbd> clears it. xterm.js is lazy-loaded, so it costs nothing until you open it.
+
+![terminal panel open below the graph, running git log](docs/terminal.png)
+
+### Git operations
+
+megit started as a viewer, but the common operations are here:
+
+- **Toolbar** — pull (fast-forward only), push, create branch, stash all, pop latest stash, undo last commit (soft reset, keeps changes staged)
+- **Ref chips** — checkout, create branch here, rename, delete, set upstream, merge, rebase, delete tag, copy name, copy GitHub link
+- **Commit rows** — checkout, cherry-pick, revert, reset (soft / mixed / hard), copy hash, copy GitHub link
+- **Files** — stage, unstage, discard, amend the last commit's message
+
+Checkout auto-stashes a dirty worktree first. Destructive items are marked as such and are hidden where they'd be meaningless.
+
+### Auto-refresh
+
+The server watches each open repository (`fs.watch`, filtered and debounced) and pushes changes to the browser over SSE. Commit in your terminal and the graph updates within about a second. <kbd>r</kbd> forces a refresh if you want one.
+
+### Keyboard
+
+| Key                                                      | Action                             |
+| -------------------------------------------------------- | ---------------------------------- |
+| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd> | move through rows                  |
+| <kbd>⌘</kbd><kbd>F</kbd>                                 | search commits                     |
+| <kbd>↵</kbd> / <kbd>⇧</kbd><kbd>↵</kbd>                  | next / previous match              |
+| <kbd>r</kbd>                                             | refresh                            |
+| <kbd>⌘</kbd><kbd>J</kbd>                                 | toggle terminal                    |
+| <kbd>⌘</kbd><kbd>K</kbd>                                 | clear terminal                     |
+| <kbd>⌘</kbd><kbd>⇧</kbd><kbd>0</kbd>                     | toggle theme                       |
+| <kbd>⌘</kbd><kbd>↵</kbd>                                 | commit                             |
+| <kbd>Esc</kbd>                                           | close search or menu / cancel edit |
+
+## Platform support
+
+| Platform             | Status                                    |
+| -------------------- | ----------------------------------------- |
+| macOS (arm64, x64)   | full                                      |
+| Windows (arm64, x64) | full, but not yet tested on real hardware |
+| Linux                | everything except the built-in terminal   |
+
+The terminal needs [node-pty](https://github.com/microsoft/node-pty), which ships prebuilt binaries for macOS and Windows only. It is an `optionalDependency`: on Linux the install either compiles it from source (needs python3 and a C++ toolchain) or skips it, and megit hides the terminal button. Nothing else is affected.
+
+## Configuration
+
+The list of open repositories lives in `~/.config/megit/config.json`. Repositories are only reachable through the API if they are registered there, so pointing megit at a repo is always an explicit act.
+
+## Development
+
+Requires pnpm.
 
 ```bash
 pnpm install
 pnpm dev        # Express API on :4500 + Vite dev server on :4000
 ```
 
-Production:
+Production build:
 
 ```bash
-pnpm build      # vite → dist/
-pnpm start      # serves dist/ + API on http://127.0.0.1:4500
+pnpm build          # vite → dist/
+pnpm build:server   # tsc → dist-server/  (only needed for publishing)
+pnpm start          # serves dist/ + API on http://127.0.0.1:4500
 ```
 
-Ports are configurable via `PORT` (API, default 3411) and `UI_PORT` (Vite dev server, default 5173); the dev/start scripts pin 4500/4000.
+Ports come from `PORT` (API, default 3411) and `UI_PORT` (Vite dev server, default 5173); the dev/start scripts pin 4500/4000.
 
-## Usage
+In development the server runs its TypeScript directly via Node's native type-stripping — no build step. That does not work for a published package, because Node refuses to strip types under `node_modules`, so `pnpm build:server` compiles `server/` to `dist-server/` at publish time.
 
-Open the app, hit “+” in the tab bar, browse to a local git repository, Open. Each repo lives in its own tab.
-
-- Commit graph with lanes, incremental “Load more” paging
-- Sticky WIP row on top — staged, unstaged, and untracked changes
-- Click a commit → changed files → per-file diff; merge commits diff against the first parent
-- Unified ⇄ side-by-side toggle, `r` or ⟳ to refresh
-- Auto-refresh — the server watches each open repo (`fs.watch` + SSE); the graph and WIP row update within ~1 s of any change. Manual refresh (`r`) still works.
-- `⌘F` to search commits — filters the rows already loaded as you type (message, author, hash prefix or ref name), `Enter` / `Shift+Enter` walk the matches. The globe button re-runs the same query as a full-history `git log` search and loads the graph down to a match that sits below the loaded rows.
-
-Keyboard: `⌘F` search · `Esc` close search · `↑`/`↓` move the selected row · `r` refresh · `⌘J` terminal · `⌘⇧0` light/dark.
-
-Repo list persists in `~/.config/megit/config.json`.
-
-## Development
+`scripts/make-test-repo.sh` generates `test-repo/` — a throwaway fixture with interleaved branches, merges, stashes and a dirty worktree, used for manual testing and for the screenshots above.
 
 ```bash
-pnpm test           # vitest (parsers, lane layout)
+pnpm test           # vitest — parsers, lane layout, watcher, menus
 npx tsc --noEmit    # typecheck
 ```
+
+## License
+
+MIT
