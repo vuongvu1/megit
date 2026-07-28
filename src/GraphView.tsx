@@ -191,6 +191,10 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   return (
     <div className={`row${selected ? ' selected' : ''}`} aria-current={selected || undefined} onClick={onSelect} onContextMenu={e => onRowMenu(e, c.hash)}>
       <span className="refs" onClick={e => e.stopPropagation()} onContextMenu={inert}>
+        {/* group wrapper so chips split the cramped width equally instead of
+            shrinking proportionally — a head chip's icons are unshrinkable, so
+            proportional shrink eats its whole name first */}
+        <span className="ref-chips">
         {chips.map(chip => {
           const canCheckout = !chip.head && !chip.tag && (chip.local || chip.remote)
           return (
@@ -212,6 +216,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
           </span>
           )
         })}
+        </span>
         {chips.length > 0 && <span className={`ref-line${isHead ? ' head' : ''}`} style={{ background: color(row.lane) }} />}
       </span>
       {chips.length > 0 && (
