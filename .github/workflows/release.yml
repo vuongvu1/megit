@@ -31,8 +31,10 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      - name: Is this version already published?
+      - name: What still needs doing for this version?
         id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for the `gh release view` probe
         run: |
           NAME=$(node -p "require('./package.json').name")
           VERSION=$(node -p "require('./package.json').version")
@@ -46,18 +48,32 @@ jobs:
 
           if [ -n "$PUBLISHED" ]; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::$NAME@$VERSION is already on npm — nothing to release"
+            echo "::notice::$NAME@$VERSION is already on npm"
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::releasing $NAME@$VERSION"
+            echo "::notice::publishing $NAME@$VERSION"
+          fi
+
+          # Asked separately from "is it published", because the two halves fail
+          # independently: a publish can succeed and the release step still die, and
+          # a version can reach npm by hand. Tying the release to the publish would
+          # mean neither case ever heals — the gate would skip everything forever.
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$VERSION already has a GitHub release"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::will tag and release v$VERSION"
           fi
 
       - if: steps.gate.outputs.publish == 'true'
         run: pnpm install --frozen-lockfile
 
-      # Fail before anything irreversible if the changelog entry is missing.
+      # Needed by the release step as well as the publish one, and it is dependency
+      # free, so it runs whenever either half has work to do. Failing here aborts
+      # before anything irreversible if the changelog entry is missing.
       - name: Extract release notes from CHANGELOG
-        if: steps.gate.outputs.publish == 'true'
+        if: steps.gate.outputs.publish == 'true' || steps.gate.outputs.release == 'true'
         env:
           VERSION: ${{ steps.gate.outputs.version }}
         run: node scripts/release-notes.mjs "$VERSION" > /tmp/notes.md
@@ -89,7 +105,7 @@ jobs:
       # `gh release create` creates the tag at --target when it does not exist,
       # so there is no separate git tag/push step to get out of sync.
       - name: Tag and create the GitHub release
-        if: steps.gate.outputs.publish == 'true'
+        if: steps.gate.outputs.release == 'true'
         env:
           VERSION: ${{ steps.gate.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
