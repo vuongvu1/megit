@@ -60,7 +60,9 @@ The release job is idempotent: its condition is "the version in `package.json` i
 
 npm is published before the tag and GitHub release exist, because npm is the half that cannot be undone. If publishing fails, nothing else was created, so fixing forward and merging again just retries. If publishing succeeds but the release step fails, create the release by hand — the package is already out.
 
-One-time setup: an `NPM_TOKEN` repository secret holding an npm **automation** token (granular tokens work; classic "publish" tokens do too). Everything else uses the built-in `GITHUB_TOKEN`.
+One-time setup: register this repository as a **[trusted publisher](https://docs.npmjs.com/trusted-publishers)** for `megit-app` on npmjs.com — package settings → Publishing access → GitHub Actions, naming the repo and `release.yml`. There is no `NPM_TOKEN` secret to create or rotate: npm exchanges the OIDC identity the job requests (`id-token: write`) for a short-lived credential, and provenance is attested automatically. `GITHUB_TOKEN` covers the release step.
+
+Why not a token: npm revoked classic tokens and disabled generating new ones in November 2025, and a classic *publish* token could never have worked here anyway — under 2FA it demands a one-time password, which fails in CI as `npm error code EOTP` only after the build has already run. Granular access tokens still work but now expire in 7 days by default (90 max), which means rotating a secret every week to publish a few times a year.
 
 ## Commit messages
 

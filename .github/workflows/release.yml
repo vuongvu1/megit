@@ -13,7 +13,7 @@ on:
 
 permissions:
   contents: write # create the tag and the GitHub release
-  id-token: write # npm provenance attestation
+  id-token: write # OIDC identity for npm trusted publishing (and its provenance)
 
 jobs:
   release:
@@ -73,13 +73,18 @@ jobs:
       - if: steps.gate.outputs.publish == 'true'
         run: pnpm build:server
 
+      # Published via trusted publishing (OIDC): npm exchanges the id-token this job
+      # requests for a short-lived credential, so there is no NPM_TOKEN to store or
+      # rotate. Classic automation tokens — the usual answer here — were revoked and
+      # their generation disabled in November 2025, and a classic *publish* token
+      # cannot work at all under 2FA because it demands an OTP no runner can supply.
+      # Provenance is automatic under OIDC, so --provenance is not passed.
+      #
       # npm first: it is the half that cannot be undone. If it fails, no tag and no
       # release exist, so fixing forward and re-merging simply tries again.
       - name: Publish to npm
         if: steps.gate.outputs.publish == 'true'
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       # `gh release create` creates the tag at --target when it does not exist,
       # so there is no separate git tag/push step to get out of sync.
