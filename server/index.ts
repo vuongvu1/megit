@@ -146,7 +146,7 @@ app.get('/api/graph', repoGuard, async (req, res) => {
   // capped: the client asks for as many as it has loaded, which grows a page at a
   // time, but an uncapped limit turns one request into the whole history (4.2 MB /
   // 380 ms on a 14.8k-commit repo). 5000 rows is far past where the DOM gives out.
-  const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 100))
+  const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 200))
   try {
     const stashRaw = await git(repo, ['stash', 'list', '--format=%H%x1f%P%x1f%ct%x1f%s']).catch(() => '')
     const stashes = stashRaw.split('\n').filter(Boolean).map(l => {

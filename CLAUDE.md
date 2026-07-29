@@ -11,7 +11,7 @@ megit — git repository viewer in the browser: commit graph with branch lanes, 
 Every change is judged against it. Concretely:
 
 - Keep the main bundle lean — heavy dependencies (xterm.js is the precedent) go in lazy `React.lazy`/dynamic-`import()` chunks; server-side natives (node-pty) load via dynamic `import()` on first use. Nothing may cost anything until the user actually uses it.
-- `/api/graph` must stay fast on 10k+-commit repos. Commits page in at 100 per request (server default and client floor) — don't raise it without measuring.
+- `/api/graph` must stay fast on 10k+-commit repos. Commits page in at 200 per request (server default and client floor) — don't raise it without measuring.
 - Avoid re-renders: RepoView gates `setState` behind fingerprint comparison; keep that pattern for new data flows.
 - Measure before claiming: `curl -w '%{time_total}'` on API routes, `pnpm build` chunk sizes, DOM row counts / `performance.getEntriesByType` in the browser. Verify against a big repo (`~/WORKSPACE/BLS/bikeleasing-app`, 14k commits — register temporarily, then remove from config).
 

@@ -14,7 +14,6 @@ Requires Node ≥ 24.
 
 ```bash
 npx megit-app              # reopen your last session
-npx megit-app ~/code/repo  # open a repository straight away
 ```
 
 Installed globally (`npm i -g megit-app`), the command is just `megit`.
@@ -25,7 +24,7 @@ Installed globally (`npm i -g megit-app`), the command is just `megit`.
 
 ### Commit graph with lanes
 
-Branches get their own colour and lane. The checked-out branch's path is drawn thicker so you can follow it at a glance, and merges bulge around the lanes they cross instead of cutting through them. Commits page in 100 at a time and load more on demand, so opening a repository never waits on the full history.
+Branches get their own colour and lane. The checked-out branch's path is drawn thicker so you can follow it at a glance, and merges bulge around the lanes they cross instead of cutting through them. Commits page in 200 at a time and load more on demand, so opening a repository never waits on the full history.
 
 Ref chips sit in their own resizable column to the left — local branches, remotes, and tags — and the graph column and message column can be dragged to whatever widths suit the repo.
 
@@ -140,6 +139,8 @@ Ports come from `PORT` (API, default 3411) and `UI_PORT` (Vite dev server, defau
 In development the server runs its TypeScript directly via Node's native type-stripping — no build step. That does not work for a published package, because Node refuses to strip types under `node_modules`, so `pnpm build:server` compiles `server/` to `dist-server/` at publish time.
 
 `scripts/make-test-repo.sh` generates `test-repo/` — a throwaway fixture with interleaved branches, merges, stashes and a dirty worktree, used for manual testing and for the screenshots above.
+
+[`docs/architecture.md`](docs/architecture.md) explains how the two halves fit together and why the graph layout lives in a pure module. [CONTRIBUTING.md](CONTRIBUTING.md) has the setup and the house rules; [SECURITY.md](SECURITY.md) has the threat model.
 
 ```bash
 pnpm test           # vitest — parsers, lane layout, watcher, menus

@@ -5,12 +5,29 @@
   "license": "MIT",
   "author": "Hoang Vuong Vu",
   "homepage": "https://github.com/vuongvu1/megit#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/vuongvu1/megit.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vuongvu1/megit.git"
+  },
   "bugs": "https://github.com/vuongvu1/megit/issues",
-  "keywords": ["git", "gui", "commit-graph", "diff", "viewer"],
+  "keywords": [
+    "git",
+    "gui",
+    "commit-graph",
+    "diff",
+    "viewer"
+  ],
   "type": "module",
-  "bin": { "megit": "bin/megit.js" },
-  "files": ["bin", "dist", "dist-server", "scripts/fix-pty-perms.mjs", "CHANGELOG.md"],
+  "bin": {
+    "megit": "bin/megit.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "dist-server",
+    "scripts/fix-pty-perms.mjs",
+    "CHANGELOG.md"
+  ],
   "engines": {
     "node": ">=24"
   },
@@ -23,7 +40,7 @@
     "prepublishOnly": "pnpm test && pnpm build && pnpm build:server",
     "postinstall": "node scripts/fix-pty-perms.mjs"
   },
-  "packageManager": "pnpm@11.15.1+sha512.81350b07e53c9538a02f1f2303b4290fa2d7be04e56e2a970c4cc4b417dc761de196edabd49d55c7dc9580db81007c44143e4e3d7e462b3000d23c255122d065",
+  "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c",
   "dependencies": {
     "express": "^5.2.1",
     "ws": "^8.21.1"
@@ -32,19 +49,19 @@
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
-    "@xterm/addon-fit": "^0.11.0",
-    "@xterm/xterm": "^6.0.0",
-    "diff2html": "^3.4.56",
-    "highlight.js": "^11.11.1",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.4",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "concurrently": "^10.0.4",
+    "diff2html": "^3.4.56",
+    "highlight.js": "^11.11.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

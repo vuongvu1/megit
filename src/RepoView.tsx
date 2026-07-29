@@ -27,9 +27,9 @@ const graphFp = (commits: Commit[], hasMore: boolean, stashes: StashEntry[] = []
   commits.map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + (hasMore ? '+' : '') + stashes.map(s => s.hash).join(',')
 
 // One page, the server's own default and the client's paging step.
-const PAGE = 100
+const PAGE = 200
 // Probe fingerprint for a silent refresh: the first page plus the stash list, which
-// arrives whole at any limit. No hasMore — a 100-commit probe always reports more
+// arrives whole at any limit. No hasMore — a one-page probe always reports more
 // while 150 rows are loaded, and that difference isn't a change in the repo.
 const headFp = (commits: Commit[], stashes: StashEntry[] = []) =>
   commits.slice(0, PAGE).map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + stashes.map(s => s.hash).join(',')
