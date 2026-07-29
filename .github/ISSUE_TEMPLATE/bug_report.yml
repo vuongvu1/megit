@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in megit misbehaves
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        megit shells out to your own `git` and reads your own repositories, so the
+        environment matters more than usual. The fields below are the ones that
+        actually narrow a bug down.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      description: Windows and Linux are less exercised than macOS — auto-refresh on Windows is currently unverified.
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: megit and Node versions
+      description: Output of `megit --version` and `node -v`.
+      placeholder: "megit 0.1.0, node v24.16.0"
+    validations:
+      required: true
+
+  - type: input
+    id: git-version
+    attributes:
+      label: git version
+      description: Output of `git --version`.
+      placeholder: "git version 2.50.1"
+
+  - type: textarea
+    id: repo-shape
+    attributes:
+      label: Repository shape
+      description: >
+        Only if relevant — roughly how many commits, whether it has submodules,
+        worktrees, LFS, or unusual refs. Graph and performance bugs usually depend on this.
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Errors
+      description: Anything in the browser console or the terminal megit is running in.
+      render: text
