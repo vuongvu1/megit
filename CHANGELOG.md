@@ -80,7 +80,8 @@ First public release.
 
 ### Platforms
 
-- macOS (arm64, x64) and Windows (arm64, x64): full support
+- macOS (arm64, x64): full support, and the only platform verified by hand
+- Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — `node-pty` is an `optionalDependency` with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
 [Unreleased]: https://github.com/vuongvu1/megit/compare/v0.1.0...HEAD

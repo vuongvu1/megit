@@ -108,10 +108,12 @@ The server watches each open repository (`fs.watch`, filtered and debounced) and
 | Platform             | Status                                    |
 | -------------------- | ----------------------------------------- |
 | macOS (arm64, x64)   | full                                      |
-| Windows (arm64, x64) | full, but not yet tested on real hardware |
+| Windows (arm64, x64) | untested on real hardware; auto-refresh unverified |
 | Linux                | everything except the built-in terminal   |
 
 The terminal needs [node-pty](https://github.com/microsoft/node-pty), which ships prebuilt binaries for macOS and Windows only. It is an `optionalDependency`: on Linux the install either compiles it from source (needs python3 and a C++ toolchain) or skips it, and megit hides the terminal button. Nothing else is affected.
+
+On Windows, the watcher integration tests crash the test worker outright, so they are skipped there and auto-refresh is not exercised by CI. Everything else in the suite runs. If you use megit on Windows, please report whether the graph updates on its own after a commit — that is the part we cannot currently verify.
 
 ## Configuration
 
