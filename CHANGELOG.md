@@ -18,7 +18,7 @@ First public release.
 - Commit graph with per-branch lanes and colours, greedy top-down lane assignment, and reserved leftmost lanes so WIP and stash connectors get straight runs into HEAD
 - The checked-out branch's path is drawn thicker and highlighted
 - Merge edges bulge around the lanes they cross rather than cutting through them
-- Commits page in 100 at a time, loading more on demand
+- Commits page in 200 at a time, loading more on demand
 - Stash entries render as their own rows, dot-connected to the commit they were taken from
 - Sticky WIP row at the top of the list whenever the worktree is dirty
 - Resizable ref / graph / message columns, with widths persisted
