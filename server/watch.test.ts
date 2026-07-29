@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { isRelevant, createDebouncer } from './watch.ts'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -106,6 +106,13 @@ async function waitFor(cond: () => boolean, timeoutMs: number): Promise<void> {
 }
 
 describe('subscribe (integration, real fs + timers)', () => {
+  // `entries` is module-level state shared by every test here. Without this, a test
+  // that leaks a watcher fails the *next* test's count assertion instead of its own,
+  // which is how a platform difference in one test turned into two confusing failures.
+  afterEach(() => {
+    expect(activeWatcherCount(), 'test leaked a watcher into the shared registry').toBe(0)
+  })
+
   it('fires on working-tree change and on commit; unsubscribe stops events', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'megit-watch-'))
     try {
@@ -132,8 +139,21 @@ describe('subscribe (integration, real fs + timers)', () => {
     }
   }, 15000)
 
-  it('throws synchronously for a missing path', () => {
-    expect(() => subscribe('/nonexistent/megit-test-path', () => {}, () => {})).toThrow()
+  // How fs.watch reports a missing path is platform-specific: macOS and Windows
+  // reject it synchronously, while on Linux recursive watching is layered over
+  // inotify and the ENOENT arrives later as an 'error' event. subscribe()'s
+  // contract is "it fails, and leaves no watcher registered" — not "it throws".
+  // /api/events already handles both, via try/catch and via onError.
+  it('reports failure for a missing path, leaving nothing in the registry', async () => {
+    const missing = join(tmpdir(), `megit-does-not-exist-${process.pid}`)
+    let failed = false
+    try {
+      subscribe(missing, () => {}, () => { failed = true })
+    } catch {
+      failed = true
+    }
+    await waitFor(() => failed, 5000)
+    expect(activeWatcherCount()).toBe(0)
   })
 
   it('stale double-unsubscribe does not evict a newer subscription from the registry', async () => {

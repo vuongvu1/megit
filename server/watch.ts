@@ -71,7 +71,13 @@ export function subscribe(repo: string, onChange: () => void, onError: () => voi
     watcher.on('error', () => {
       entries.delete(repo)
       debouncer.dispose()
-      watcher.close()
+      // The watcher may have failed before it ever started (a path that vanished, or
+      // never existed — Linux reports that here rather than throwing from watch()).
+      // Closing one in that state is not portable, and a throw inside an 'error'
+      // handler is an uncaught exception that takes the server down with it.
+      try {
+        watcher.close()
+      } catch { /* already dead — nothing to release */ }
       for (const s of [...subs]) s.onError()
       subs.clear()
     })
