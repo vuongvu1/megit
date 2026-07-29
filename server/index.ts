@@ -5,11 +5,11 @@ import { existsSync, readdirSync } from 'node:fs'
 import { readFile, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
-import { loadConfig, saveConfig, isPermutation } from './config.ts'
+import { loadConfig, saveConfig, isPermutation, type Config } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
-import { wireTerminal } from './term.ts'
+import { wireTerminal, hasPty } from './term.ts'
 
 const app = express()
 app.use(express.json())
@@ -71,7 +71,11 @@ const repoGuard: RequestHandler = (req, res, next) => {
   next()
 }
 
-app.get('/api/config', (_req, res) => res.json(loadConfig()))
+// Every route that hands the client a Config goes through this, so the terminal
+// capability can't be clobbered by a later /api/active or /api/repos response.
+const withCaps = (c: Config) => ({ ...c, hasTerminal: hasPty() })
+
+app.get('/api/config', (_req, res) => res.json(withCaps(loadConfig())))
 
 app.post('/api/repos', async (req, res) => {
   const path = resolve(String(req.body.path ?? ''))
@@ -85,7 +89,7 @@ app.post('/api/repos', async (req, res) => {
   if (!cfg.repos.includes(path)) cfg.repos.push(path)
   cfg.activeRepo = path
   saveConfig(cfg)
-  res.json(cfg)
+  res.json(withCaps(cfg))
 })
 
 app.delete('/api/repos', (req, res) => {
@@ -94,7 +98,7 @@ app.delete('/api/repos', (req, res) => {
   cfg.repos = cfg.repos.filter(r => r !== path)
   if (cfg.activeRepo === path) cfg.activeRepo = cfg.repos[0] ?? null
   saveConfig(cfg)
-  res.json(cfg)
+  res.json(withCaps(cfg))
 })
 
 app.put('/api/active', (req, res) => {
@@ -104,7 +108,7 @@ app.put('/api/active', (req, res) => {
     cfg.activeRepo = repo
     saveConfig(cfg)
   }
-  res.json(cfg)
+  res.json(withCaps(cfg))
 })
 
 app.put('/api/repos/order', (req, res) => {
@@ -116,7 +120,7 @@ app.put('/api/repos/order', (req, res) => {
   }
   cfg.repos = repos
   saveConfig(cfg)
-  res.json(cfg)
+  res.json(withCaps(cfg))
 })
 
 app.get('/api/fs', (req, res) => {
@@ -142,7 +146,7 @@ app.get('/api/graph', repoGuard, async (req, res) => {
   // capped: the client asks for as many as it has loaded, which grows a page at a
   // time, but an uncapped limit turns one request into the whole history (4.2 MB /
   // 380 ms on a 14.8k-commit repo). 5000 rows is far past where the DOM gives out.
-  const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 100))
+  const limit = Math.min(5000, Math.max(1, Number(req.query.limit) || 200))
   try {
     const stashRaw = await git(repo, ['stash', 'list', '--format=%H%x1f%P%x1f%ct%x1f%s']).catch(() => '')
     const stashes = stashRaw.split('\n').filter(Boolean).map(l => {
@@ -786,4 +790,16 @@ if (existsSync(dist)) {
 }
 
 const port = Number(process.env.PORT) || 3411
-wireTerminal(app.listen(port, '127.0.0.1', () => console.log(`megit API on http://127.0.0.1:${port}`)))
+
+// exported so bin/megit.js can wait for 'listening' before opening the browser.
+// The banner hangs off the 'listening' event rather than app.listen's callback:
+// express 5 runs that callback even when the bind failed, which would announce a
+// URL that never came up.
+export const server = app.listen(port, '127.0.0.1')
+server.on('listening', () => console.log(`megit API on http://127.0.0.1:${port}`))
+server.on('error', (e: NodeJS.ErrnoException) => {
+  if (e.code !== 'EADDRINUSE') throw e
+  console.error(`megit: port ${port} is already in use — set PORT to a free port, e.g. PORT=3412 megit`)
+  process.exit(1)
+})
+wireTerminal(server)

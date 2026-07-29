@@ -5,7 +5,8 @@ import DirBrowser from './DirBrowser'
 import RepoView from './RepoView'
 import Toasts from './Toast'
 
-export type Config = { repos: string[]; activeRepo: string | null }
+// hasTerminal is server-reported: node-pty is optional and has no Linux prebuild
+export type Config = { repos: string[]; activeRepo: string | null; hasTerminal: boolean }
 
 // Fetch failures already surface inside RepoView; a *render* throw is the one that
 // unmounts the tree and leaves a blank window with only the console to explain it.
@@ -58,7 +59,7 @@ export default function App() {
       {cfg.activeRepo
         ? (
           <Boundary key={cfg.activeRepo}>
-            <RepoView repo={cfg.activeRepo} onRemove={() => close(cfg.activeRepo!)} />
+            <RepoView repo={cfg.activeRepo} onRemove={() => close(cfg.activeRepo!)} hasTerminal={cfg.hasTerminal} />
           </Boundary>
         )
         : <div className="empty">No repository open — add one with “+”</div>}

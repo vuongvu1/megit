@@ -188,8 +188,8 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
     <div className="diffview">
       <div className="diff-toolbar">
         <div className="view-toggle">
-          <button className={split ? '' : 'active'} onClick={() => { setSplit(false); localStorage.setItem('megit-diff-split', '0') }}>Diff View</button>
-          <button className={split ? 'active' : ''} onClick={() => { setSplit(true); localStorage.setItem('megit-diff-split', '1') }}>File View</button>
+          <button className={split ? '' : 'active'} aria-pressed={!split} onClick={() => { setSplit(false); localStorage.setItem('megit-diff-split', '0') }}>Unified</button>
+          <button className={split ? 'active' : ''} aria-pressed={split} onClick={() => { setSplit(true); localStorage.setItem('megit-diff-split', '1') }}>Split</button>
         </div>
       </div>
       {plain

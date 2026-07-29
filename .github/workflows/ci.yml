@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    # The matrix is the point, not thoroughness theatre: megit claims Windows support
+    # and a Linux install that degrades gracefully without node-pty, and neither claim
+    # has ever been exercised on real hardware. Linux also proves the optionalDependency
+    # actually is optional — there is no node-pty prebuild for it.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from packageManager in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: npx tsc --noEmit
+
+      - run: pnpm test
+
+      # Build both halves. The server build is publish-only, so nothing else would
+      # catch it breaking until `npm publish` ran prepublishOnly.
+      - run: pnpm build
+      - run: pnpm build:server
+
+      # Smoke-test the real published entrypoint. This is what would have caught
+      # ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING before it shipped.
+      - run: node bin/megit.js --version

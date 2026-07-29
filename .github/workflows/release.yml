@@ -1,0 +1,100 @@
+name: Release
+
+# Releases happen when main moves, which — with main protected — means when a PR
+# is merged. Nothing is published from a branch, and no one has to remember to tag:
+# the workflow tags the released commit itself.
+#
+# The trigger is deliberately not the version bump. It is "main changed, and the
+# version in package.json is not on npm yet", which makes the job idempotent: a
+# re-run, a revert-and-remerge, or a docs-only merge all no-op instead of failing.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # create the tag and the GitHub release
+  id-token: write # npm provenance attestation
+
+jobs:
+  release:
+    if: github.repository == 'vuongvu1/megit'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Is this version already published?
+        id: gate
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Test the OUTPUT, not the exit code. On npm 11 both "no such version" and
+          # "no such package" exit 1 and print nothing, but that has not been stable
+          # across npm versions, whereas "prints the version iff it is published" has.
+          # `|| true` keeps the non-zero exit from killing the step under `set -e`.
+          PUBLISHED=$(npm view "$NAME@$VERSION" version 2>/dev/null || true)
+
+          if [ -n "$PUBLISHED" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$NAME@$VERSION is already on npm — nothing to release"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::releasing $NAME@$VERSION"
+          fi
+
+      - if: steps.gate.outputs.publish == 'true'
+        run: pnpm install --frozen-lockfile
+
+      # Fail before anything irreversible if the changelog entry is missing.
+      - name: Extract release notes from CHANGELOG
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.gate.outputs.version }}
+        run: node scripts/release-notes.mjs "$VERSION" > /tmp/notes.md
+
+      # These run again inside prepublishOnly, which is the safety net for a manual
+      # publish. Running them here puts a failure on its own step, before publishing.
+      - if: steps.gate.outputs.publish == 'true'
+        run: npx tsc --noEmit
+      - if: steps.gate.outputs.publish == 'true'
+        run: pnpm test
+      - if: steps.gate.outputs.publish == 'true'
+        run: pnpm build
+      - if: steps.gate.outputs.publish == 'true'
+        run: pnpm build:server
+
+      # npm first: it is the half that cannot be undone. If it fails, no tag and no
+      # release exist, so fixing forward and re-merging simply tries again.
+      - name: Publish to npm
+        if: steps.gate.outputs.publish == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # `gh release create` creates the tag at --target when it does not exist,
+      # so there is no separate git tag/push step to get out of sync.
+      - name: Tag and create the GitHub release
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.gate.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          case "$VERSION" in
+            *-*) PRERELEASE=--prerelease ;;   # 0.2.0-beta.1
+            *)   PRERELEASE= ;;
+          esac
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file /tmp/notes.md \
+            $PRERELEASE
