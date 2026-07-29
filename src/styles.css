@@ -117,6 +117,9 @@ button:hover { background: var(--border); }
    the on-screen rows pay for it */
 .refs, .graph-col { transition: filter .15s; }
 .graph-pane.busy .refs, .graph-pane.busy .graph-col { filter: blur(1px); pointer-events: none; }
+/* progress, not wait: rows stay clickable (selecting a commit is a read), the pane is
+   merely stale. .row wins over the pane by specificity, so it's named explicitly */
+.graph-pane.busy, .graph-pane.busy .row { cursor: progress; }
 /* Offscreen rows skip layout and paint: at 1000 loaded rows a full relayout of the
    list (splitter drag, theme switch, --refs-w change) went 19.9ms → 4.2ms. The
    intrinsic size is the exact row height, so the scrollbar doesn't estimate and
