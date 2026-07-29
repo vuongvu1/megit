@@ -56,9 +56,11 @@ gh pr create --fill
 
 Merge it and the release happens. A version containing a hyphen (`0.2.0-beta.1`) is published as a prerelease.
 
-The release job is idempotent: its condition is "the version in `package.json` is not on npm", not "the version changed". Merging docs, re-running the workflow, or reverting and re-merging all no-op rather than failing or double-publishing. It aborts before publishing if `CHANGELOG.md` has no section for the version.
+The release job is idempotent, and asks two questions independently: *is this version on npm?* and *does a GitHub release exist for the tag?* Each half runs only if its own answer is no. Merging docs, re-running the workflow, or reverting and re-merging all no-op rather than failing or double-publishing. It aborts before publishing if `CHANGELOG.md` has no section for the version.
 
-npm is published before the tag and GitHub release exist, because npm is the half that cannot be undone. If publishing fails, nothing else was created, so fixing forward and merging again just retries. If publishing succeeds but the release step fails, create the release by hand — the package is already out.
+The two are decoupled because they fail separately. A publish can succeed while tagging dies, or a version can reach npm by hand — and if the release step were tied to the publish step, neither case would ever heal: the gate would see the version on npm and skip everything, forever. Split, the next push to `main` finishes whatever is missing.
+
+npm goes first, because it is the half that cannot be undone.
 
 One-time setup: register this repository as a **[trusted publisher](https://docs.npmjs.com/trusted-publishers)** for `megit-app` on npmjs.com — package settings → Publishing access → GitHub Actions, naming the repo and `release.yml`. There is no `NPM_TOKEN` secret to create or rotate: npm exchanges the OIDC identity the job requests (`id-token: write`) for a short-lived credential, and provenance is attested automatically. `GITHUB_TOKEN` covers the release step.
 
