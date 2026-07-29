@@ -1,6 +1,6 @@
 // Filesystem watching for auto-refresh: which paths matter, and event debouncing.
 
-import { watch } from 'node:fs'
+import { existsSync, watch } from 'node:fs'
 import type { FSWatcher } from 'node:fs'
 
 // dependency/build dirs git will never report on: an install or a bundler watch
@@ -59,6 +59,15 @@ export function activeWatcherCount(): number {
 export function subscribe(repo: string, onChange: () => void, onError: () => void): () => void {
   let entry = entries.get(repo)
   if (!entry) {
+    // fs.watch does not agree across platforms about a path that isn't there:
+    // macOS and Windows reject it, but Linux — where recursive watching is layered
+    // over inotify — hands back a watcher that never fires and never errors. That
+    // silently dead subscription is worse than a failure, because the caller has no
+    // way to find out. Checking here makes the contract identical everywhere:
+    // subscribing to a missing path throws, and registers nothing.
+    if (!existsSync(repo)) {
+      throw Object.assign(new Error(`ENOENT: no such directory, watch '${repo}'`), { code: 'ENOENT' })
+    }
     const subs = new Set<Sub>()
     const debouncer = createDebouncer(() => {
       for (const s of subs) s.onChange()

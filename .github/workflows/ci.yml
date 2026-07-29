@@ -32,7 +32,10 @@ jobs:
 
       - run: npx tsc --noEmit
 
-      - run: pnpm test
+      # verbose + sequential files: when a worker dies without reporting (seen on
+      # windows-latest), the last test printed is the one that killed it. Drop these
+      # flags once that is understood.
+      - run: pnpm test -- --reporter=verbose --no-file-parallelism
 
       # Build both halves. The server build is publish-only, so nothing else would
       # catch it breaking until `npm publish` ran prepublishOnly.

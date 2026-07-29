@@ -7,8 +7,11 @@
 //
 // Separate file: the mock replaces node:fs for the whole module graph, and
 // watch.test.ts needs the real one for its integration tests.
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const h = vi.hoisted(() => ({ watchers: [] as (EventEmitter & { close: () => void })[] }))
 
@@ -28,12 +31,23 @@ const { subscribe, activeWatcherCount } = await import('./watch.ts')
 
 const lastWatcher = () => h.watchers[h.watchers.length - 1]
 
-describe('subscribe, when fs.watch defers the error (the Linux path)', () => {
+// Real directories: subscribe() rejects a missing path before it ever reaches
+// fs.watch, so these have to exist for the mocked watcher to be created at all.
+const dirs: string[] = []
+const freshDir = () => {
+  const d = mkdtempSync(join(tmpdir(), 'megit-mock-'))
+  dirs.push(d)
+  return d
+}
+afterEach(() => {
+  while (dirs.length) rmSync(dirs.pop()!, { recursive: true, force: true })
+  expect(activeWatcherCount()).toBe(0)
+})
+
+describe('subscribe, when a started watcher errors later', () => {
   it('reports the failure through onError and drops the registry entry', () => {
     let failed = false
-    expect(() => subscribe('/nonexistent/a', () => {}, () => { failed = true })).not.toThrow()
-
-    // registered optimistically — this is the window that leaked into other tests
+    subscribe(freshDir(), () => {}, () => { failed = true })
     expect(activeWatcherCount()).toBe(1)
 
     lastWatcher().emit('error', Object.assign(new Error('watch ENOENT'), { code: 'ENOENT' }))
@@ -44,10 +58,10 @@ describe('subscribe, when fs.watch defers the error (the Linux path)', () => {
 
   it('survives a watcher whose close() throws', () => {
     let failed = false
-    subscribe('/nonexistent/b', () => {}, () => { failed = true })
+    subscribe(freshDir(), () => {}, () => { failed = true })
 
-    // closing a watcher that never started is not portable; an uncaught throw here
-    // would escape the 'error' handler and take the process down
+    // a watcher whose directory vanished may refuse to close; an uncaught throw
+    // here would escape the 'error' handler and take the process down
     lastWatcher().close = () => { throw Object.assign(new Error('EPERM'), { code: 'EPERM' }) }
 
     expect(() => lastWatcher().emit('error', new Error('watch ENOENT'))).not.toThrow()

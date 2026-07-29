@@ -139,20 +139,12 @@ describe('subscribe (integration, real fs + timers)', () => {
     }
   }, 15000)
 
-  // How fs.watch reports a missing path is platform-specific: macOS and Windows
-  // reject it synchronously, while on Linux recursive watching is layered over
-  // inotify and the ENOENT arrives later as an 'error' event. subscribe()'s
-  // contract is "it fails, and leaves no watcher registered" — not "it throws".
-  // /api/events already handles both, via try/catch and via onError.
-  it('reports failure for a missing path, leaving nothing in the registry', async () => {
+  // subscribe() checks the path itself rather than letting fs.watch decide, because
+  // fs.watch disagrees across platforms: macOS and Windows reject a missing path,
+  // but Linux hands back a watcher that never fires and never errors. See watch.ts.
+  it('throws for a missing path, registering nothing', () => {
     const missing = join(tmpdir(), `megit-does-not-exist-${process.pid}`)
-    let failed = false
-    try {
-      subscribe(missing, () => {}, () => { failed = true })
-    } catch {
-      failed = true
-    }
-    await waitFor(() => failed, 5000)
+    expect(() => subscribe(missing, () => {}, () => {})).toThrow(/ENOENT/)
     expect(activeWatcherCount()).toBe(0)
   })
 
