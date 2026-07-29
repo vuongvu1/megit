@@ -53,7 +53,10 @@ button:hover { background: var(--border); }
 .tab { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px 6px 0 0; background: var(--bg-tab); cursor: pointer; }
 .tab.active { background: var(--bg-panel); }
 .tab.dragging { opacity: 0.5; }
-.tab-close { border: none; background: none; padding: 0 2px; }
+/* -2px margin lets an 18px hit target sit inside the tab's 6px vertical padding without growing the tab. */
+.tab-close { border: none; background: none; padding: 0; margin: -2px -4px -2px 0; width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; color: var(--fg-dim); }
+/* --border, not --bg-hover: the latter is nearly identical to the active tab's --bg-panel. */
+.tab-close:hover { background: var(--border); color: var(--fg); }
 .tab-add { border: none; padding: 6px 12px; background: none; font-size: 15px; }
 
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
