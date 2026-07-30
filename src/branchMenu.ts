@@ -2,7 +2,12 @@ import type { MenuItem } from './ContextMenu'
 
 // %D chips as GraphView builds them: local and remote refs of the same name are
 // one chip carrying both flags, so a menu has to read the flags, not the name
-export type RefChip = { name: string; local: boolean; remote: boolean; tag: boolean; head: boolean }
+export type RefChip = { name: string; local: boolean; remote: boolean; tag: boolean; head: boolean; remoteRef?: string }
+
+// What git is handed for a chip. `name` is the display name with the remote prefix
+// stripped, so a remote-only chip has to fall back to the full `origin/x` ref —
+// otherwise a diverged `origin/main` would resolve to the local `main`.
+export const chipRef = (chip: RefChip) => (chip.local ? chip.name : chip.remoteRef ?? chip.name)
 
 export type BranchAction =
   | 'checkout' | 'pull' | 'push' | 'upstream'
@@ -42,9 +47,12 @@ export function branchMenu(chip: RefChip, { current, hasRemote, canLink, run }: 
     }
   } else {
     add('Checkout', 'checkout')
-    if (chip.local && current) {
-      add(`Merge ${chip.name} into ${current}`, 'merge')
-      add(`Rebase ${current} onto ${chip.name}`, 'rebase')
+    if (current) {
+      // remote chips too: a remote-tracking ref is exactly what you merge or rebase
+      // onto once the local branch has diverged from it
+      const ref = chipRef(chip)
+      add(`Merge ${ref} into ${current}`, 'merge')
+      add(`Rebase ${current} onto ${ref}`, 'rebase')
     }
   }
 
