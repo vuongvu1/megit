@@ -469,7 +469,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
       let insertIdx = commits.findIndex(c => c.date <= s.date)
       if (insertIdx < 0 || insertIdx > endIdx) insertIdx = endIdx // never below its base
       const taken = spans.filter(t => t.from <= endIdx && insertIdx <= t.to).map(t => t.lane)
-      const { idx, lane } = stashSlot(rows, insertIdx, endIdx, taken)
+      const { idx, lane } = stashSlot(rows, insertIdx, endIdx, taken, maxLanes)
       spans.push({ lane, from: idx, to: endIdx })
       lanes = Math.max(lanes, lane + 1)
       byRow.set(idx, [...(byRow.get(idx) ?? []), { s, endIdx, lane }])
