@@ -50,7 +50,8 @@ function parseRefs(refs: string[], remotes: string[]): RefChip[] {
       if (head || r === 'HEAD') c.head = true
     }
   }
-  return [...chips.values()]
+  // branches left, tags right — sort is stable, so git's own order survives within each group
+  return [...chips.values()].sort((a, b) => Number(a.tag) - Number(b.tag))
 }
 
 const LocalIcon = () => (
