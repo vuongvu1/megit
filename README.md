@@ -87,7 +87,9 @@ Checkout auto-stashes a dirty worktree first. Destructive items are marked as su
 
 ### Auto-refresh
 
-The server watches each open repository (`fs.watch`, filtered and debounced) and pushes changes to the browser over SSE. Commit in your terminal and the graph updates within about a second. <kbd>r</kbd> forces a refresh if you want one.
+The server watches each open repository (`fs.watch`, filtered and debounced) and pushes changes to the browser over SSE. Commit in your terminal and the graph updates within about a second.
+
+Auto-refresh only ever reads local git, so commits pushed by someone else stay invisible until something fetches. <kbd>r</kbd> and the ⟳ button therefore fetch from the remote first, then refresh — that is the one path that surfaces new upstream commits and refreshes the Pull/Push badges. A fetch that fails (offline, no remote) is ignored and the local refresh still happens.
 
 ### Keyboard
 
@@ -96,7 +98,7 @@ The server watches each open repository (`fs.watch`, filtered and debounced) and
 | <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd> | move through rows                  |
 | <kbd>⌘</kbd><kbd>F</kbd>                                 | search commits                     |
 | <kbd>↵</kbd> / <kbd>⇧</kbd><kbd>↵</kbd>                  | next / previous match              |
-| <kbd>r</kbd>                                             | refresh                            |
+| <kbd>r</kbd>                                             | fetch from remote, then refresh    |
 | <kbd>⌘</kbd><kbd>J</kbd>                                 | toggle terminal                    |
 | <kbd>⌘</kbd><kbd>K</kbd>                                 | clear terminal                     |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>0</kbd>                     | toggle theme                       |

@@ -28,6 +28,8 @@ Graph queries use `--date-order`, deliberately not `--topo-order`: topological o
 
 **`watch.ts` drives auto-refresh.** One `fs.watch` per open repository, filtered by `isRelevant`, fed into a trailing debouncer with a max-wait cap (400 ms quiet flush, 2 s under sustained churn — a long install or a big rebase still updates twice a second rather than never). Changes are pushed to the browser over SSE at `/api/events`, with a 30 s `: ping` comment to keep intermediaries from closing an idle stream.
 
+**Only a manual refresh touches the network.** `/api/graph` and `/api/status` read local git, which cannot see upstream commits until something fetches — so Pull was once the only button that surfaced them. The ⟳ button and <kbd>r</kbd> now POST `{action:'fetch'}` to `/api/branch` and re-enter `refresh` for the local read; a failed fetch is swallowed so the read still lands. Everything else stays local-only on purpose: SSE refetches fire every 400 ms–2 s, and RepoView remounts per tab switch, so neither may cost a round-trip.
+
 **`/api/graph` pages.** 200 commits per request by default, clamped to 5000 — an uncapped limit turns one request into the entire history (4.2 MB / 380 ms on a 14.8k-commit repo), and 5000 rows is already far past where the DOM gives out.
 
 **`/api/search` is the one expensive route.** git ANDs its commit-limiting options, so "message OR author OR hash" cannot be one invocation — it is three `git log` runs unioned by `mergeMatches`, sorted date-descending and capped at 500. `-F` keeps a typed `(` or `.` literal instead of a regex; `--max-count=501` lets the server tell "exactly 500" from "more than 500" so the UI can show a truncation marker. It only runs when the user explicitly asks for full-history search.

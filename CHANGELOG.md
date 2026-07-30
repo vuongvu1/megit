@@ -9,6 +9,10 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Fixed
+
+- Refresh (⟳ button and <kbd>r</kbd>) now fetches from the remote before re-reading the repository. It previously only read local git, so commits pushed by someone else — and the Pull/Push badge counts — stayed stale until you hit Pull. Auto-refresh over SSE and the initial load of a tab remain local-only, so neither costs a network round-trip; a fetch that fails is ignored and the local refresh still happens.
+
 ## [0.1.0] - 2026-07-28
 
 First public release.
