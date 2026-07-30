@@ -37,7 +37,7 @@ export default function TabBar({ repos, active, onSelect, onAdd, onClose, onReor
           onDragEnd={() => { setDragIdx(null); onReorderEnd() }}
         >
           {base(r)}
-          <button className="tab-close" onClick={e => { e.stopPropagation(); onClose(r) }}>×</button>
+          <button className="tab-close" title={`Close ${base(r)}`} aria-label={`Close ${base(r)}`} onClick={e => { e.stopPropagation(); onClose(r) }}>×</button>
         </div>
       ))}
       <button className="tab-add" onClick={onAdd}>+</button>
