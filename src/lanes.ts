@@ -108,18 +108,21 @@ export function freeLane(rows: LaneRow[], from: number, to: number, taken: numbe
   return l
 }
 
-// Stash slot: chronological row when the clear lane stays adjacent to the
-// insertion row's own traffic (at most one lane beyond it), else snapped to
-// the base commit's row — busy history can push the clear lane arbitrarily
-// far right, detached from everything and past the visible column. Snapped
+// Stash slot: chronological row when the clear lane either hugs the insertion
+// row's own traffic (at most one lane beyond it) or at least stays inside the
+// width the graph already draws (`maxLanes`) — busy history can push the clear
+// lane arbitrarily far right, and a stash past the visible column reads as
+// detached from everything. A lane the graph already spends width on costs
+// nothing extra, so chronology wins there even when local traffic is quiet.
+// Only past that width does the stash snap to its base commit's row. Snapped
 // stashes reuse the base's own lane only when nothing solid crosses it there
 // (a child branch entering the base's dot from above would run straight
 // through the square); otherwise they take the first free lane at that row.
-export function stashSlot(rows: LaneRow[], insertIdx: number, endIdx: number, taken: number[]): { idx: number; lane: number } {
+export function stashSlot(rows: LaneRow[], insertIdx: number, endIdx: number, taken: number[], maxLanes: number): { idx: number; lane: number } {
   const lane = freeLane(rows, insertIdx, endIdx, taken)
   const r = rows[insertIdx]
   const local = Math.max(-1, r.lane, ...r.through, ...r.incoming, ...r.outgoing, ...taken)
-  if (lane <= local + 1 || insertIdx === endIdx) return { idx: insertIdx, lane }
+  if (lane <= local + 1 || lane < maxLanes || insertIdx === endIdx) return { idx: insertIdx, lane }
   const base = rows[endIdx].lane
   const clear = !taken.includes(base) && !rows[endIdx].through.includes(base) && !rows[endIdx].incoming.includes(base)
   return { idx: endIdx, lane: clear ? base : freeLane(rows, endIdx, endIdx, taken) }

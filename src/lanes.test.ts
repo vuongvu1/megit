@@ -95,39 +95,57 @@ describe('layout with a reserved lane', () => {
 
 describe('stashSlot', () => {
   it('keeps the chronological slot when the clear lane hugs local traffic', () => {
-    const { rows } = layout([c('t2', 't1'), c('t1', 'm'), c('m', 'a'), c('a')], 'm')
-    expect(stashSlot(rows, 0, 2, [])).toEqual({ idx: 0, lane: 0 })
+    const { rows, maxLanes } = layout([c('t2', 't1'), c('t1', 'm'), c('m', 'a'), c('a')], 'm')
+    expect(stashSlot(rows, 0, 2, [], maxLanes)).toEqual({ idx: 0, lane: 0 })
   })
 
   it('keeps a slot one lane beyond the insertion row traffic', () => {
     // merge m(b,x) fills lanes 0-1 across the span; lane 2 is adjacent to the
     // insertion row's own outgoing lanes 0-1 — still reads as attached
-    const { rows } = layout([c('m', 'b', 'x'), c('b', 'a'), c('x', 'a'), c('a')])
-    expect(stashSlot(rows, 0, 3, [])).toEqual({ idx: 0, lane: 2 })
+    const { rows, maxLanes } = layout([c('m', 'b', 'x'), c('b', 'a'), c('x', 'a'), c('a')])
+    expect(stashSlot(rows, 0, 3, [], maxLanes)).toEqual({ idx: 0, lane: 2 })
   })
 
   it('snaps to the base commit when the clear lane detaches from local traffic', () => {
     // quiet top row, but an octopus merge below occupies lanes 0-3 across the
-    // span: the chronological slot would float alone on lane 4
+    // span: the chronological slot would float alone on lane 4, past the
+    // rightmost lane the graph draws
     const commits = [c('t', 'm'), c('m', 'a', 'b', 'x', 'y'), c('a'), c('b'), c('x'), c('y')]
-    const { rows } = layout(commits)
+    const { rows, maxLanes } = layout(commits)
     expect(freeLane(rows, 0, 5, [])).toBe(4)
+    expect(maxLanes).toBe(4)
     // y's own lane (3) carries the merge line into its dot — first free lane instead
-    expect(stashSlot(rows, 0, 5, [])).toEqual({ idx: 5, lane: 0 })
+    expect(stashSlot(rows, 0, 5, [], maxLanes)).toEqual({ idx: 5, lane: 0 })
+  })
+
+  it('keeps the chronological slot when the clear lane fits the drawn width', () => {
+    // same detached-from-local-traffic shape as above, but wider history below
+    // the base already spends the columns: lane 4 is inside the graph, so the
+    // stash stays at its chronological row instead of snapping down to the base
+    const commits = [
+      c('t', 'm'), c('m', 'a', 'b', 'x', 'y'),
+      c('a', 'w'), c('b', 'w'), c('x', 'w'), c('y', 'w'),
+      c('w', 'p', 'q', 'r', 's', 'u', 'v'),
+      c('p'), c('q'), c('r'), c('s'), c('u'), c('v'),
+    ]
+    const { rows, maxLanes } = layout(commits)
+    expect(freeLane(rows, 0, 5, [])).toBe(4)
+    expect(maxLanes).toBeGreaterThan(4)
+    expect(stashSlot(rows, 0, 5, [], maxLanes)).toEqual({ idx: 0, lane: 4 })
   })
 
   it('snaps to a free lane when solid lines enter the base on its own lane', () => {
     // two branches off m: both enter m's dot from above (incoming [0,1]), so
     // the base's own lane carries a solid line — stash must not sit on it
     const commits = [c('t1b', 't1a'), c('t1a', 'm'), c('t2b', 't2a'), c('t2a', 'm'), c('m', 'a'), c('a')]
-    const { rows } = layout(commits)
+    const { rows, maxLanes } = layout(commits)
     expect(rows[4].incoming).toEqual([0, 1])
-    expect(stashSlot(rows, 0, 4, [])).toEqual({ idx: 4, lane: 2 })
+    expect(stashSlot(rows, 0, 4, [], maxLanes)).toEqual({ idx: 4, lane: 2 })
   })
 
   it('never snaps a stash already at its base', () => {
-    const { rows } = layout([c('b', 'a'), c('a')])
-    expect(stashSlot(rows, 1, 1, [])).toEqual({ idx: 1, lane: 1 })
+    const { rows, maxLanes } = layout([c('b', 'a'), c('a')])
+    expect(stashSlot(rows, 1, 1, [], maxLanes)).toEqual({ idx: 1, lane: 1 })
   })
 })
 
