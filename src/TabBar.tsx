@@ -41,6 +41,7 @@ export default function TabBar({ repos, active, onSelect, onAdd, onClose, onReor
         </div>
       ))}
       <button className="tab-add" onClick={onAdd}>+</button>
+      <span className="build-tag">{import.meta.env.DEV ? '[DEV]' : `v${__VERSION__}`}</span>
     </div>
   )
 }

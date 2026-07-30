@@ -1,8 +1,12 @@
 import { defineConfig, configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import pkg from './package.json'
 
 export default defineConfig({
   plugins: [react()],
+  // Baked in at build time so the badge costs no request and no runtime lookup;
+  // import.meta.env.DEV then lets the prod bundle drop the "[DEV]" branch entirely.
+  define: { __VERSION__: JSON.stringify(pkg.version) },
   server: {
     port: Number(process.env.UI_PORT) || 5173,
     proxy: { '/api': { target: `http://127.0.0.1:${process.env.PORT || 3411}`, ws: true } },
