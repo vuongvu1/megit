@@ -454,6 +454,12 @@ app.post('/api/branch', repoGuard, async (req, res) => {
         await git(repo, ['branch', `--set-upstream-to=${upstream}`, branch])
         break
       }
+      case 'fetch':
+        // --prune so remote-tracking chips don't outlive branches deleted upstream.
+        // ponytail: no --all — the default remote is the one Pull/Push and the
+        // ahead/behind badges act on, so it's the one the badges need fresh.
+        await git(repo, ['fetch', '--prune'], [0], NET_TIMEOUT)
+        break
       case 'pull':
         await git(repo, ['pull', '--ff-only', '--autostash'], [0], NET_TIMEOUT)
         break

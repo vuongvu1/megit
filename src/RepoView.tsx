@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import type { BranchHeader, Commit, StashEntry, StatusEntry } from '../server/parse.ts'
-import { api } from './api'
+import { api, jsonInit } from './api'
 import GraphView from './GraphView'
 import type { DiffSide } from './wip'
 import CommitPanel from './CommitPanel'
@@ -97,9 +97,20 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
   // entirely below page 1 (deep rebase) needs a manual `r`.
   // named function expression, not an arrow: a probe that finds page 1 moved calls
   // straight back into `run` for the full refetch
-  const refresh = useCallback(function run(silent = false, full = !silent) {
+  // return type is explicit because `run` recurses into itself (the fetch re-entry)
+  const refresh = useCallback(function run(silent = false, full = !silent, fetched = false): Promise<void> {
     // spin only on manual refresh — silent SSE refetches must not re-render RepoView
     if (!silent) { setError(null); inflight.current = true; setSpinning(true) }
+    // A manual refresh fetches first, then re-enters for the local read: local git
+    // cannot see upstream commits until something fetches, which is why Pull was the
+    // only button that ever surfaced them. Silent SSE refetches stay local-only — an
+    // fs event must never cost a network round-trip. A failed fetch (offline, no
+    // remote) is swallowed so the local read still lands. Re-entering rather than
+    // awaiting inline keeps `gen` claimed *after* the fetch, so an SSE refresh firing
+    // during those seconds can't supersede this one and drop its results.
+    if (!silent && !fetched) return api(`/api/branch?${q}`, jsonInit('POST', { action: 'fetch' }))
+      .catch(() => {})
+      .then(() => run(false, full, true))
     const g = ++gen.current
     const probe = !full && loaded.current > PAGE
     const limit = probe ? PAGE : Math.max(loaded.current, PAGE)
@@ -151,7 +162,10 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
     })
   }, [q])
 
-  useEffect(() => { refresh() }, [refresh])
+  // `fetched` on the initial load: App keys RepoView by repo, so every tab switch
+  // remounts and this would otherwise pay a network fetch per switch. Only an explicit
+  // Refresh (button or `r`) reaches the remote.
+  useEffect(() => { refresh(false, true, true) }, [refresh])
 
   // spin the toolbar refresh icon while an arbitrary async action (e.g. checkout) runs,
   // then refetch immediately — beats the fs.watch → SSE → 400ms-debounce round-trip
@@ -346,7 +360,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
               </svg>
             </a>
           )}
-          <button className="refresh-btn" onClick={() => refresh()} title="Refresh (r)" aria-label="Refresh">
+          <button className="refresh-btn" onClick={() => refresh()} title="Fetch & refresh (r)" aria-label="Fetch and refresh">
             <svg className={spinning ? 'spin' : undefined} onAnimationIteration={() => { if (!inflight.current) setSpinning(false) }} viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
