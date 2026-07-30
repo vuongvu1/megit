@@ -9,14 +9,18 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-30
+
 ### Added
 
 - Merge and Rebase in the right-click menu of a remote branch chip, not only a local one. When a local branch has diverged from its upstream — a local commit here, a new commit on the remote — `origin/x` is drawn as its own chip, and that chip is exactly what you want to merge in or rebase onto. The actions address the branch by its full remote-tracking ref, so a diverged `origin/main` can never resolve to the local `main`.
-- A build badge in the top-right of the tab bar: `[DEV]` when running the Vite dev server, the package version (`v0.1.0`) in a production build. Baked in at build time, so it costs no request and the unused branch is dropped from the production bundle.
+- A build badge in the top-right of the tab bar: `[DEV]` when running the Vite dev server, the package version (`v0.2.0`) in a production build. Baked in at build time, so it costs no request and the unused branch is dropped from the production bundle.
 
 ### Fixed
 
 - Refresh (⟳ button and <kbd>r</kbd>) now fetches from the remote before re-reading the repository. It previously only read local git, so commits pushed by someone else — and the Pull/Push badge counts — stayed stale until you hit Pull. Auto-refresh over SSE and the initial load of a tab remain local-only, so neither costs a network round-trip; a fetch that fails is ignored and the local refresh still happens.
+- Ref chips are ordered branches-first, tags-last, instead of taking whatever order git listed them in. The sort is stable, so git's ordering still decides within each group.
+- The tab close button is a real 18×18 target with a hover ring and a `Close <repo>` label for screen readers, and its cross is an SVG rather than a `×` glyph — a text glyph is positioned from the font's baseline, so flex centring aligned its line box and left the visible ink off-centre.
 
 ## [0.1.0] - 2026-07-28
 
@@ -93,5 +97,6 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — `node-pty` is an `optionalDependency` with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/vuongvu1/megit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vuongvu1/megit/releases/tag/v0.1.0
