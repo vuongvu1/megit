@@ -25,7 +25,7 @@ CI runs all of this on Linux, macOS and Windows, plus `pnpm build:server` and a 
 
 ## Things worth knowing
 
-**Performance is the top priority.** Concretely: heavy dependencies belong in lazy `React.lazy`/`import()` chunks (xterm.js is the precedent), server-side natives load via dynamic `import()` on first use, and `/api/graph` has to stay fast on 10k-commit repositories. Commits page in 100 at a time; don't raise that without measuring. Measure before claiming — `curl -w '%{time_total}'` on API routes, `pnpm build` chunk sizes, DOM row counts in the browser.
+**Performance is the top priority.** Concretely: heavy dependencies belong in lazy `React.lazy`/`import()` chunks (xterm.js is the precedent), server-side natives load via dynamic `import()` on first use, and `/api/graph` has to stay fast on 10k-commit repositories. Commits page in 200 at a time; don't raise that without measuring. Measure before claiming — `curl -w '%{time_total}'` on API routes, `pnpm build` chunk sizes, DOM row counts in the browser.
 
 **`lanes.ts` is the graph.** It is a pure, unit-tested layout module: `layout()` does greedy top-down lane assignment, with a reservation mechanism that pins the leftmost lanes for WIP and stash connectors. `GraphView.tsx` should stay a dumb renderer of the `LaneRow`s it produces. When changing graph behaviour, change `lanes.ts` and its tests first.
 
