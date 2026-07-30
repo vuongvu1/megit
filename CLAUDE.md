@@ -55,6 +55,7 @@ End-to-end verification (build, launch, drive with Playwright, API curl probes):
 
 ## Workflow
 
+- Start every request on a fresh branch off `main`: `git checkout -b <feat|fix|docs|chore>/<slug>`. Uncommitted changes carry across, so a request already underway can be moved retroactively. Never let work pile up on `main`.
 - Do not run `git commit` or `git rm` — the user commits at task boundaries.
 - `~/.config/megit/config.json` is real user state. To drive the app without touching it (screenshots, probes), launch the server with an isolated `HOME`.
 - Design docs and implementation plans live in `docs/superpowers/{specs,plans}/`.
