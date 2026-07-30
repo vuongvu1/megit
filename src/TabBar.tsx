@@ -37,7 +37,14 @@ export default function TabBar({ repos, active, onSelect, onAdd, onClose, onReor
           onDragEnd={() => { setDragIdx(null); onReorderEnd() }}
         >
           {base(r)}
-          <button className="tab-close" title={`Close ${base(r)}`} aria-label={`Close ${base(r)}`} onClick={e => { e.stopPropagation(); onClose(r) }}>×</button>
+          <button className="tab-close" title={`Close ${base(r)}`} aria-label={`Close ${base(r)}`} onClick={e => { e.stopPropagation(); onClose(r) }}>
+            {/* SVG, not a × glyph: a text glyph is placed by the font's baseline, so flex centering
+                centers its line box and leaves the visible ink off-centre. This cross is symmetric
+                about the viewBox centre, and as a flex item it has no baseline to fight. */}
+            <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
+              <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
       ))}
       <button className="tab-add" onClick={onAdd}>+</button>
