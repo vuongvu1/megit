@@ -49,6 +49,7 @@ End-to-end verification (build, launch, drive with Playwright, API curl probes):
 - **Express 5 runs the `app.listen(port, host, cb)` callback even when the bind fails** (`server.listening === false`). Hang startup logging off the `'listening'` event instead.
 - **vitest excludes `test-repo/`** (`vite.config.ts`) — the generated fixture contains a plausible `test/renderer.test.ts` that would otherwise join the real suite.
 - **Watcher integration tests are skipped on Windows** — a real recursive `fs.watch` kills the vitest worker with no output. Windows auto-refresh is therefore unverified.
+- **`npx megit-app` fails with `sh: megit: command not found` when run from anywhere inside this repo.** A bare name is a `*` range to npm, which matches the repo's own root package, so npx decides it's already installed, skips the cache install, and never adds a bin dir to PATH (`libnpmexec/lib/index.js` — line 56 returns the local node, so line 306's `binPaths.push` is skipped). Smoke-test with `node bin/megit.js` or `npx megit-app@latest` instead. Not a user-facing bug.
 - **`rm -rf` is often denied** by the permission layer; use `node -e "fs.rmSync(p,{recursive:true,force:true})"`.
 - **`ps` is shadowed by an npm alias** in this shell; use `/bin/ps`.
 - Test-count and per-test-duration arithmetic is the fastest way to identify which file killed a CI worker that reported nothing.
