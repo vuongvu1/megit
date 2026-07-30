@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { branchMenu, type RefChip } from './branchMenu'
+import { branchMenu, chipRef, type RefChip } from './branchMenu'
 
 const chip = (over: Partial<RefChip>): RefChip =>
   ({ name: 'feature', local: true, remote: false, tag: false, head: false, ...over })
@@ -36,10 +36,22 @@ describe('branchMenu', () => {
     expect(labels(chip({}), ctx({ current: null }))).not.toContain('Merge feature into null')
   })
 
-  it('gives a remote-only chip no local-branch actions', () => {
-    expect(labels(chip({ local: false, remote: true, name: 'origin-only' }), ctx())).toEqual([
-      'Checkout', 'Copy remote branch name', 'Copy GitHub link',
+  it('gives a remote-only chip no local-branch actions, but still merge/rebase', () => {
+    const remote = chip({ local: false, remote: true, name: 'origin-only', remoteRef: 'origin/origin-only' })
+    expect(labels(remote, ctx())).toEqual([
+      'Checkout', 'Merge origin/origin-only into main', 'Rebase main onto origin/origin-only',
+      'Copy remote branch name', 'Copy GitHub link',
     ])
+  })
+
+  it('merges a diverged remote by its full ref, never the like-named local branch', () => {
+    const run = vi.fn()
+    const remote = chip({ local: false, remote: true, name: 'main', remoteRef: 'origin/main' })
+    expect(chipRef(remote)).toBe('origin/main')
+    const items = branchMenu(remote, ctx({ current: 'main', run }))
+    expect(items.map(i => i.label)).toContain('Merge origin/main into main')
+    items.find(i => i.label === 'Rebase main onto origin/main')!.onClick()
+    expect(run).toHaveBeenCalledWith('rebase')
   })
 
   it('gives a tag delete and copy actions, and none of the branch ones', () => {

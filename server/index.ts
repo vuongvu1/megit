@@ -441,7 +441,9 @@ app.post('/api/branch', repoGuard, async (req, res) => {
       }
       case 'merge':
       case 'rebase': {
-        const branch = mustExist(await locals(), req.body.branch, 'branch')
+        // remote-tracking refs count: once a local branch has diverged from its
+        // upstream, origin/x is its own chip and merging it is the point
+        const branch = mustExist([...await locals(), ...await knownRefs(repo, 'refs/remotes')], req.body.branch, 'branch')
         // --autostash, matching the auto-stash /api/checkout does — git's flag,
         // not our own stash dance. A conflict stops and stays stopped: the files
         // show up in the WIP row and get resolved in the terminal.

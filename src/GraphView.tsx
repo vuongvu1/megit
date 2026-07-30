@@ -2,7 +2,7 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState, type CSSPropertie
 import type { Commit, StashEntry, StatusEntry } from '../server/parse.ts'
 import { api, jsonInit } from './api'
 import ContextMenu, { type MenuItem } from './ContextMenu'
-import { branchMenu, type RefChip } from './branchMenu'
+import { branchMenu, chipRef, type RefChip } from './branchMenu'
 import { commitMenu } from './commitMenu'
 import { layout, stashSlot, activeTrail, type LaneRow, type TrailRow } from './lanes'
 import { rowOrder, sameRow, step } from './rowNav'
@@ -43,7 +43,9 @@ function parseRefs(refs: string[], remotes: string[]): RefChip[] {
     if (remote) {
       const name = r.slice(remote.length + 1)
       if (name === 'HEAD') continue // origin/HEAD symref — noise
-      get(name).remote = true
+      const c = get(name)
+      c.remote = true
+      c.remoteRef ??= r // first remote wins when several carry the branch
     } else {
       const c = get(r)
       c.local = true
@@ -406,8 +408,8 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
         case 'checkout': return checkout(chip.name)
         case 'pull': return void branchApi({ action: 'pull' }, 'Pull')
         case 'push': return void branchApi({ action: 'push' }, 'Push')
-        case 'merge': return void branchApi({ action: 'merge', branch: chip.name }, 'Merge')
-        case 'rebase': return void branchApi({ action: 'rebase', branch: chip.name }, 'Rebase')
+        case 'merge': return void branchApi({ action: 'merge', branch: chipRef(chip) }, 'Merge')
+        case 'rebase': return void branchApi({ action: 'rebase', branch: chipRef(chip) }, 'Rebase')
         case 'upstream': {
           const upstream = prompt(`Track which remote branch?`, `${remotes[0] ?? 'origin'}/${chip.name}`)
           if (upstream) branchApi({ action: 'upstream', branch: chip.name, upstream }, 'Set upstream')

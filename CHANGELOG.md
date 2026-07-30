@@ -11,6 +11,7 @@ surface, and the HTTP API may change in any minor release.
 
 ### Added
 
+- Merge and Rebase in the right-click menu of a remote branch chip, not only a local one. When a local branch has diverged from its upstream — a local commit here, a new commit on the remote — `origin/x` is drawn as its own chip, and that chip is exactly what you want to merge in or rebase onto. The actions address the branch by its full remote-tracking ref, so a diverged `origin/main` can never resolve to the local `main`.
 - A build badge in the top-right of the tab bar: `[DEV]` when running the Vite dev server, the package version (`v0.1.0`) in a production build. Baked in at build time, so it costs no request and the unused branch is dropped from the production bundle.
 
 ### Fixed
