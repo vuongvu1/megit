@@ -16,6 +16,8 @@ Requires Node ≥ 24.
 npx megit-app              # reopen your last session
 ```
 
+The package is `megit-app` — `npx megit` is an unrelated package by someone else, so keep the `-app`.
+
 Installed globally (`npm i -g megit-app`), the command is just `megit`.
 
 `PORT` picks the port (default 3411). The server opens your browser at it.
