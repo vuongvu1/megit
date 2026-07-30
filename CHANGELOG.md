@@ -9,6 +9,10 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Added
+
+- A build badge in the top-right of the tab bar: `[DEV]` when running the Vite dev server, the package version (`v0.1.0`) in a production build. Baked in at build time, so it costs no request and the unused branch is dropped from the production bundle.
+
 ### Fixed
 
 - Refresh (⟳ button and <kbd>r</kbd>) now fetches from the remote before re-reading the repository. It previously only read local git, so commits pushed by someone else — and the Pull/Push badge counts — stayed stale until you hit Pull. Auto-refresh over SSE and the initial load of a tab remain local-only, so neither costs a network round-trip; a fetch that fails is ignored and the local refresh still happens.
