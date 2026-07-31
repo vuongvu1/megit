@@ -13,7 +13,7 @@ Nothing leaves your machine: the server binds `127.0.0.1`, shells out to your ow
 Requires Node ≥ 22.
 
 ```bash
-npx megit-app              # reopen your last session
+npx megit-app
 ```
 
 The package is `megit-app` — `npx megit` is an unrelated package by someone else, so keep the `-app`.
@@ -68,7 +68,9 @@ Author and committer are shown separately when they differ — including the dat
 
 <kbd>⌘</kbd><kbd>F</kbd> opens a find bar that filters the rows already loaded, as you type — matching commit message, author name, email, hash prefix, or ref name. That costs no request and can't go stale when the graph refreshes underneath you. <kbd>↵</kbd> and <kbd>⇧</kbd><kbd>↵</kbd> walk the matches, wrapping at the ends the way a find bar should.
 
-If what you want is further back than the rows you've loaded, the globe button re-runs the same query as a full-history `git log` search. Because git ANDs its commit-limiting options, "message OR author OR hash" is three searches unioned into one date-ordered list, capped at 500 results — the counter shows `12 of 340 · all`, with a `+` when the cap truncated it. A match below the loaded window pulls the graph down to it.
+![the find bar over the graph, showing a match counter and the current match selected](docs/search.png)
+
+If what you want is further back than the rows you've loaded, the globe button re-runs the same query as a full-history `git log` search. Because git ANDs its commit-limiting options, "message OR author OR hash" is three searches unioned into one date-ordered list, capped at 500 results — the counter shows `12 of 340 · all`, and `340+` when the cap truncated it. A match below the loaded window pulls the graph down to it.
 
 ### A real shell, in the repo
 
@@ -109,11 +111,11 @@ Auto-refresh only ever reads local git, so commits pushed by someone else stay i
 
 ## Platform support
 
-| Platform             | Status                                    |
-| -------------------- | ----------------------------------------- |
-| macOS (arm64, x64)   | full                                      |
+| Platform             | Status                                             |
+| -------------------- | -------------------------------------------------- |
+| macOS (arm64, x64)   | full                                               |
 | Windows (arm64, x64) | untested on real hardware; auto-refresh unverified |
-| Linux                | everything except the built-in terminal   |
+| Linux                | everything except the built-in terminal            |
 
 The terminal needs [node-pty](https://github.com/microsoft/node-pty), which ships prebuilt binaries for macOS and Windows only. It is an `optionalDependency`: on Linux the install either compiles it from source (needs python3 and a C++ toolchain) or skips it, and megit hides the terminal button. Nothing else is affected.
 
@@ -125,7 +127,7 @@ The list of open repositories lives in `~/.config/megit/config.json`. Repositori
 
 ## Development
 
-Requires pnpm.
+Requires Node ≥ 24 and pnpm — a development-only floor, since the server runs its TypeScript unbuilt (the published package ships compiled JS and only needs Node ≥ 22).
 
 ```bash
 pnpm install
