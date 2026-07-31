@@ -2,7 +2,7 @@
 
 ## Setup
 
-Node ≥ 24 and pnpm. The server runs TypeScript directly via Node's native type-stripping, so there is no build step in development.
+Node ≥ 24 and pnpm. The server runs TypeScript directly via Node's native type-stripping, so there is no build step in development. That is a development-only requirement: the published package ships compiled JavaScript and declares `engines: node >=22`.
 
 ```bash
 pnpm install

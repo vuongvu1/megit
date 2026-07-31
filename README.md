@@ -10,7 +10,7 @@ Nothing leaves your machine: the server binds `127.0.0.1`, shells out to your ow
 
 ## Install
 
-Requires Node ≥ 24.
+Requires Node ≥ 22.
 
 ```bash
 npx megit-app              # reopen your last session
