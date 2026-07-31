@@ -9,6 +9,10 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Changed
+
+- The published package now requires Node ≥ 22 instead of ≥ 24, so `npx megit-app` no longer prints an `EBADENGINE` warning on Node 22 or 23. Node 24 was only ever needed to run `server/*.ts` directly in development; the package ships `dist-server/` compiled to ES2022, whose real floor is `import.meta.dirname` (Node 20.11). Development and CI stay on Node 24.
+
 ### Fixed
 
 - A stash newer than every commit no longer sinks to its base commit's row. Stash placement snaps a stash down to its base when the first lane clear of solid graph lines sits more than one lane past the insertion row's own traffic — a guard against a stash square floating alone past the right edge. On a busy history that fired far too eagerly: a stash taken minutes ago landed eleven rows down, next to a day-old base. The guard now also keeps the chronological row whenever the clear lane fits inside the width the graph already draws, which is the width the original check was really about.
