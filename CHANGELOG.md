@@ -9,6 +9,8 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-01
+
 ### Added
 
 - Split terminal panes: <kbd>⌘D</kbd> (or the split button in the panel header) divides the terminal panel into up to four side-by-side shells, each its own PTY with its own scrollback. A pane goes away when its shell exits (`exit`, <kbd>⌃D</kbd>) or via the ✕ in its top-right corner, which kills the shell rather than orphaning it; closing the last one closes the panel. The layout is remembered per repository, so switching tabs and coming back reattaches every pane. The four-pane cap is enforced server-side, not just in the UI — the WebSocket spawns login shells, so an unbounded pane index would be an unbounded shell factory.
@@ -109,6 +111,7 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — `node-pty` is an `optionalDependency` with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vuongvu1/megit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vuongvu1/megit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vuongvu1/megit/releases/tag/v0.1.0
