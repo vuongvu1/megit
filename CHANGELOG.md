@@ -9,6 +9,10 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Added
+
+- Split terminal panes: <kbd>⌘D</kbd> (or the split button in the panel header) divides the terminal panel into up to four side-by-side shells, each its own PTY with its own scrollback. A pane goes away when its shell exits (`exit`, <kbd>⌃D</kbd>) or via the ✕ in its top-right corner, which kills the shell rather than orphaning it; closing the last one closes the panel. The layout is remembered per repository, so switching tabs and coming back reattaches every pane. The four-pane cap is enforced server-side, not just in the UI — the WebSocket spawns login shells, so an unbounded pane index would be an unbounded shell factory.
+
 ### Changed
 
 - The published package now requires Node ≥ 22 instead of ≥ 24, so `npx megit-app` no longer prints an `EBADENGINE` warning on Node 22 or 23. Node 24 was only ever needed to run `server/*.ts` directly in development; the package ships `dist-server/` compiled to ES2022, whose real floor is `import.meta.dirname` (Node 20.11). Development and CI stay on Node 24.

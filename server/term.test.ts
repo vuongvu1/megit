@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { pushCapped } from './term.ts'
+import { MAX_PANES, pushCapped, termKey } from './term.ts'
+
+describe('termKey', () => {
+  it('scopes the session to repo and pane', () => {
+    expect(termKey('/r', '0')).toBe('/r\x000')
+    expect(termKey('/r', '1')).not.toBe(termKey('/r', '0'))
+  })
+
+  it('defaults a missing pane to 0', () => {
+    expect(termKey('/r', null)).toBe(termKey('/r', '0'))
+  })
+
+  it('rejects panes past the cap', () => {
+    expect(termKey('/r', String(MAX_PANES))).toBeNull()
+    expect(termKey('/r', '9')).toBeNull()
+  })
+
+  it('rejects anything that is not a single digit', () => {
+    for (const bad of ['', ' 1', '1 ', '01', '-1', '1e0', '0x1', 'a', '1/../2'])
+      expect(termKey('/r', bad)).toBeNull()
+  })
+})
 
 describe('pushCapped', () => {
   it('accumulates below the cap', () => {

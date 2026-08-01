@@ -34,7 +34,7 @@ Graph queries use `--date-order`, deliberately not `--topo-order`: topological o
 
 **`/api/search` is the one expensive route.** git ANDs its commit-limiting options, so "message OR author OR hash" cannot be one invocation — it is three `git log` runs unioned by `mergeMatches`, sorted date-descending and capped at 500. `-F` keeps a typed `(` or `.` literal instead of a regex; `--max-count=501` lets the server tell "exactly 500" from "more than 500" so the UI can show a truncation marker. It only runs when the user explicitly asks for full-history search.
 
-**`term.ts` is the only native dependency.** node-pty loads through a dynamic `import()` on first attach, so it costs nothing until a terminal is opened, and `hasPty()` answers "is it installed?" via `require.resolve` without loading the binding — that keeps `/api/config` cheap and lets Linux, which has no prebuild, degrade to hiding the button.
+**`term.ts` is the only native dependency.** node-pty loads through a dynamic `import()` on first attach, so it costs nothing until a terminal is opened, and `hasPty()` answers "is it installed?" via `require.resolve` without loading the binding — that keeps `/api/config` cheap and lets Linux, which has no prebuild, degrade to hiding the button. Sessions are keyed by `(repo, pane)` via `termKey`, which is also where the four-pane cap is enforced: the upgrade handler destroys the socket for any pane index it rejects, so the client's cap is a UI convenience, not the security boundary.
 
 ## Client
 
