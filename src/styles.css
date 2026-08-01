@@ -101,9 +101,19 @@ button:hover { background: var(--border); }
 .term-resizer:hover, .term-resizer:active { background: #5a80b0; }
 .term-head { display: flex; align-items: center; justify-content: space-between; padding: 3px 6px 3px 8px; flex-shrink: 0; }
 .term-title { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-dim); }
-.term-close { border: none; background: none; padding: 0 4px; font-size: 13px; color: var(--fg-dim); }
+.term-head-actions { display: inline-flex; align-items: center; gap: 2px; }
+.term-close { display: inline-flex; align-items: center; border: none; background: none; padding: 0 4px; font-size: 13px; color: var(--fg-dim); }
 .term-close:hover { color: var(--fg); background: none; }
-.term-host { flex: 1; min-height: 0; padding: 4px 0 0 8px; }
+.term-close:disabled { opacity: 0.35; }
+/* ponytail: equal-width panes, no drag splitter between them — add one if 2 panes
+   at 50/50 stops being enough */
+.term-panes { display: flex; flex: 1; min-height: 0; }
+.term-pane { position: relative; flex: 1; min-width: 0; display: flex; }
+.term-pane + .term-pane { border-left: 1px solid var(--border); }
+.term-pane-kill { position: absolute; top: 0; right: 4px; z-index: 2; border: none; background: none; padding: 0 3px; font-size: 12px; line-height: 1.2; color: transparent; }
+.term-pane:hover .term-pane-kill { color: var(--fg-dim); }
+.term-pane-kill:hover, .term-pane-kill:focus-visible { color: var(--fg); background: none; }
+.term-host { flex: 1; min-height: 0; min-width: 0; padding: 4px 0 0 8px; }
 .term-host .xterm { height: 100%; }
 .theme-switch { position: relative; display: inline-flex; align-items: center; justify-content: space-between; width: 40px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--bg-hover); border: 1px solid var(--border); color: var(--fg-dim); cursor: pointer; flex-shrink: 0; }
 .theme-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
