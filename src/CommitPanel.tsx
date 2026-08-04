@@ -241,7 +241,9 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
     if (confirm(`${what}\n\nThis cannot be undone.`)) wipPost({ action: 'discard-file', path }, 'Discard', onChanged)
   }
   const discardAll = () => {
-    if (!confirm(`Discard all ${files.length} uncommitted change${files.length > 1 ? 's' : ''}?\n\nStaged and unstaged edits go back to HEAD and untracked files are deleted. This cannot be undone — stash them instead to keep them.`)) return
+    const n = sides.unstaged.length
+    if (!n) return
+    if (!confirm(`Discard all ${n} unstaged change${n > 1 ? 's' : ''}?\n\nTracked files go back to their staged content and untracked files are deleted. Staged changes are kept. This cannot be undone — stash them instead to keep them.`)) return
     wipPost({ action: 'discard' }, 'Discard', onChanged)
   }
   const stashScope = (scope: 'staged' | 'unstaged') => {
