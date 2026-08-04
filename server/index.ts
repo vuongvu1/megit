@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { readFile, realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
-import { loadConfig, saveConfig, isPermutation, type Config } from './config.ts'
+import { loadConfig, saveConfig, isPermutation, touchRecent, type Config } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { subscribe } from './watch.ts'
@@ -88,6 +88,7 @@ app.post('/api/repos', async (req, res) => {
   const cfg = loadConfig()
   if (!cfg.repos.includes(path)) cfg.repos.push(path)
   cfg.activeRepo = path
+  cfg.recent = touchRecent(cfg.recent, path)
   saveConfig(cfg)
   res.json(withCaps(cfg))
 })
