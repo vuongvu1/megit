@@ -586,9 +586,10 @@ app.post('/api/wip', repoGuard, async (req, res) => {
         break
       }
       case 'discard':
-        // everything back to HEAD: tracked files restored on both sides, untracked
-        // removed. No -x — ignored files (node_modules, .env) are not "changes".
-        await git(repo, ['restore', '--staged', '--worktree', '--', '.'])
+        // unstaged only: worktree back to the index, so staged content survives.
+        // clean removes untracked files — a staged new file is tracked, so it stays.
+        // No -x — ignored files (node_modules, .env) are not "changes".
+        await git(repo, ['restore', '--worktree', '--', '.'])
         await git(repo, ['clean', '-fd'])
         break
       case 'stash': {
