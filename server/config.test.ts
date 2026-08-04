@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { isPermutation } from './config.ts'
+import { isPermutation, touchRecent } from './config.ts'
+
+describe('touchRecent', () => {
+  it('puts the path first', () => {
+    expect(touchRecent(['a', 'b'], 'c')).toEqual(['c', 'a', 'b'])
+  })
+  it('moves an existing path to the front instead of duplicating it', () => {
+    expect(touchRecent(['a', 'b', 'c'], 'c')).toEqual(['c', 'a', 'b'])
+  })
+  it('caps the list, dropping the least recent', () => {
+    const ten = Array.from({ length: 10 }, (_, i) => `r${i}`)
+    const out = touchRecent(ten, 'new')
+    expect(out).toHaveLength(10)
+    expect(out[0]).toBe('new')
+    expect(out).not.toContain('r9')
+  })
+})
 
 describe('isPermutation', () => {
   it.each<[string[], string[], boolean]>([

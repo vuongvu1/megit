@@ -9,6 +9,11 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Added
+
+- The add-repo dialog lists up to 10 recent repositories. Ones already open are marked and
+  clicking them switches to that tab; closing a tab keeps the repo in the list.
+
 ## [0.3.0] - 2026-08-01
 
 ### Added

@@ -6,7 +6,7 @@ import RepoView from './RepoView'
 import Toasts from './Toast'
 
 // hasTerminal is server-reported: node-pty is optional and has no Linux prebuild
-export type Config = { repos: string[]; activeRepo: string | null; hasTerminal: boolean }
+export type Config = { repos: string[]; activeRepo: string | null; recent: string[]; hasTerminal: boolean }
 
 // Fetch failures already surface inside RepoView; a *render* throw is the one that
 // unmounts the tree and leaves a blank window with only the console to explain it.
@@ -55,7 +55,15 @@ export default function App() {
   return (
     <div className="app">
       <TabBar repos={cfg.repos} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} onReorder={reorder} onReorderEnd={reorderEnd} />
-      {browsing && <DirBrowser onPicked={c => { setCfg(c); setBrowsing(false) }} onClose={() => setBrowsing(false)} />}
+      {browsing && (
+        <DirBrowser
+          recent={cfg.recent}
+          open={cfg.repos}
+          onPicked={c => { setCfg(c); setBrowsing(false) }}
+          onSelect={select}
+          onClose={() => setBrowsing(false)}
+        />
+      )}
       {cfg.activeRepo
         ? (
           <Boundary key={cfg.activeRepo}>

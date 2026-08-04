@@ -4,7 +4,15 @@ import type { Config } from './App'
 
 type FsDir = { path: string; parent: string | null; dirs: { name: string; path: string; isRepo: boolean }[]; isRepo: boolean }
 
-export default function DirBrowser({ onPicked, onClose }: { onPicked: (c: Config) => void; onClose: () => void }) {
+const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
+
+export default function DirBrowser({ recent, open, onPicked, onSelect, onClose }: {
+  recent: string[]
+  open: string[]
+  onPicked: (c: Config) => void
+  onSelect: (r: string) => void
+  onClose: () => void
+}) {
   const [dir, setDir] = useState<FsDir | null>(null)
   const [error, setError] = useState('')
 
@@ -17,6 +25,14 @@ export default function DirBrowser({ onPicked, onClose }: { onPicked: (c: Config
   const pick = (path: string) =>
     api<Config>('/api/repos', jsonInit('POST', { path })).then(onPicked).catch(e => setError(e.message))
 
+  // An already-open repo is a tab switch, not a re-add: adding it again would
+  // reorder nothing and just round-trip the config.
+  const openRecent = (path: string) => {
+    if (!open.includes(path)) return pick(path)
+    onSelect(path)
+    onClose()
+  }
+
   if (!dir) return null
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -28,6 +44,21 @@ export default function DirBrowser({ onPicked, onClose }: { onPicked: (c: Config
           <button onClick={onClose}>×</button>
         </div>
         {error && <div className="error">{error}</div>}
+        {recent.length > 0 && (
+          <>
+            <div className="modal-label">Recent</div>
+            <ul className="dirlist recent">
+              {recent.map(r => (
+                <li key={r}>
+                  <span className="dirname" title={r} onClick={() => openRecent(r)}>
+                    {base(r)}<span className="recent-path">{r}</span>
+                  </span>
+                  {open.includes(r) && <span className="recent-open">open</span>}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         <ul className="dirlist">
           {dir.dirs.map(d => (
             <li key={d.path}>
