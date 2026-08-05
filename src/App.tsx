@@ -59,6 +59,7 @@ export default function App() {
         <DirBrowser
           recent={cfg.recent}
           open={cfg.repos}
+          active={cfg.activeRepo}
           onPicked={c => { setCfg(c); setBrowsing(false) }}
           onSelect={select}
           onClose={() => setBrowsing(false)}

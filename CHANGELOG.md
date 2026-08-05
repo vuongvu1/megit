@@ -9,6 +9,13 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Changed
+
+- The add-repo dialog is now two panes: recent repositories on the left, the current
+  directory's path header and folder list on the right. Recent entries show just the
+  repository name with a dot when it is already open and a highlight on the active one; folder
+  rows carry a chevron, and the path header bolds the directory you are in.
+
 ## [0.4.1] - 2026-08-05
 
 ### Fixed
