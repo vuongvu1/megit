@@ -22,6 +22,12 @@ export default function DirBrowser({ recent, open, onPicked, onSelect, onClose }
   }
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [onClose])
+
   const pick = (path: string) =>
     api<Config>('/api/repos', jsonInit('POST', { path })).then(onPicked).catch(e => setError(e.message))
 
