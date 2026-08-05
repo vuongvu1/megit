@@ -8,19 +8,28 @@ Nothing leaves your machine: the server binds `127.0.0.1`, shells out to your ow
 
 ![megit — commit graph with branch lanes, stash rows and the sticky WIP row](docs/graph-dark.png)
 
-## Install
+## Getting started
 
-Requires Node ≥ 22.
+Requires Node ≥ 22. The package is 1.7 MB, with `express` and `ws` as its only runtime dependencies.
+
+**Run it once, without installing:**
 
 ```bash
 npx megit-app
 ```
 
-The package is `megit-app` — `npx megit` is an unrelated package by someone else, so keep the `-app`.
+**Or install it, and run `megit` from anywhere:**
 
-Installed globally (`npm i -g megit-app`), the command is just `megit`.
+```bash
+npm i -g megit-app
+megit
+```
 
-`PORT` picks the port (default 3411). The server opens your browser at it.
+Upgrade later with `npm i -g megit-app@latest`.
+
+Either way the server starts on port 3411 — set `PORT` to change that — and opens your browser at it.
+
+<sub>The package is `megit-app`; `megit` on npm is unrelated, so keep the `-app`. The installed command is still `megit`.</sub>
 
 ## Features
 
