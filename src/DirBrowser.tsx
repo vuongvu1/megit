@@ -6,9 +6,10 @@ type FsDir = { path: string; parent: string | null; dirs: { name: string; path: 
 
 const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 
-export default function DirBrowser({ recent, open, onPicked, onSelect, onClose }: {
+export default function DirBrowser({ recent, open, active, onPicked, onSelect, onClose }: {
   recent: string[]
   open: string[]
+  active: string | null
   onPicked: (c: Config) => void
   onSelect: (r: string) => void
   onClose: () => void
@@ -42,37 +43,42 @@ export default function DirBrowser({ recent, open, onPicked, onSelect, onClose }
   if (!dir) return null
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-head">
-          <button disabled={!dir.parent} onClick={() => dir.parent && load(dir.parent)}>↑</button>
-          <span className="modal-path">{dir.path}</span>
-          {dir.isRepo && <button onClick={() => pick(dir.path)}>Add</button>}
-          <button onClick={onClose}>×</button>
-        </div>
-        {error && <div className="error">{error}</div>}
+      <div className="modal picker" onClick={e => e.stopPropagation()}>
         {recent.length > 0 && (
-          <>
+          <div className="picker-pane picker-recent">
             <div className="modal-label">Recent</div>
-            <ul className="dirlist recent">
+            <ul className="dirlist">
               {recent.map(r => (
-                <li key={r}>
-                  <span className="dirname" title={r} onClick={() => openRecent(r)}>
-                    {base(r)}<span className="recent-path">{r}</span>
-                  </span>
-                  {open.includes(r) && <span className="recent-open">open</span>}
+                <li key={r} className={r === active ? 'sel' : ''}>
+                  <span className="dirname" title={r} onClick={() => openRecent(r)}>{base(r)}</span>
+                  {open.includes(r) && <span className="recent-dot" title="open" />}
                 </li>
               ))}
             </ul>
-          </>
+          </div>
         )}
-        <ul className="dirlist">
-          {dir.dirs.map(d => (
-            <li key={d.path}>
-              <span className="dirname" onClick={() => load(d.path)}>{d.isRepo ? '● ' : ''}{d.name}</span>
-              {d.isRepo && <button onClick={() => pick(d.path)}>Add</button>}
-            </li>
-          ))}
-        </ul>
+        <div className="picker-pane">
+          <div className="modal-head">
+            <button disabled={!dir.parent} onClick={() => dir.parent && load(dir.parent)}>↑</button>
+            <span className="modal-path" title={dir.path}>
+              {dir.path.slice(0, dir.path.length - base(dir.path).length)}
+              <b>{base(dir.path)}</b>
+            </span>
+            {dir.isRepo && <button onClick={() => pick(dir.path)}>Add</button>}
+            <button onClick={onClose}>×</button>
+          </div>
+          {error && <div className="error">{error}</div>}
+          <div className="modal-label">Folders</div>
+          <ul className="dirlist">
+            {dir.dirs.map(d => (
+              <li key={d.path}>
+                <span className="dirname" onClick={() => load(d.path)}>{d.name}</span>
+                {d.isRepo && <button onClick={() => pick(d.path)}>Add</button>}
+                <span className="dir-chevron" onClick={() => load(d.path)}>›</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   )

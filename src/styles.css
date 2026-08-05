@@ -70,10 +70,16 @@ button:hover { background: var(--border); }
 .dirlist li:hover { background: var(--bg-hover); }
 .dirname { flex: 1; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .modal-label { padding: 8px 12px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--fg-dim); }
-/* Capped so a long recent list can't push the directory listing out of the modal. */
-.recent { max-height: 30vh; border-bottom: 1px solid var(--border); flex: none; }
-.recent-path { margin-left: 8px; color: var(--fg-dim); font-size: 11px; }
-.recent-open { font-size: 10px; text-transform: uppercase; color: var(--fg-dim); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; }
+.modal-path b { color: var(--fg); }
+/* The repo picker is two panes side by side, so it needs the extra width. Fixed
+   height: panes scroll independently and the dialog never resizes as you navigate.
+   overflow:hidden keeps the recent pane's background inside the rounded corners. */
+.picker { flex-direction: row; width: 720px; height: 440px; max-height: 80vh; overflow: hidden; }
+.picker-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.picker-recent { flex: none; width: 240px; border-right: 1px solid var(--border); background: var(--bg-tab); }
+.picker-recent .dirlist li.sel { background: var(--bg-selected); }
+.recent-dot { width: 6px; height: 6px; border-radius: 50%; background: #2ea043; flex-shrink: 0; }
+.dir-chevron { color: var(--fg-faint); cursor: pointer; padding-left: 8px; }
 
 .repoview { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); animation: appear 0.5s ease-out; }
 @keyframes appear { from { opacity: 0; } }
