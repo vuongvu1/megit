@@ -156,7 +156,10 @@ button:hover { background: var(--border); }
 .diff-close { border: none; background: none; padding: 0 4px; font-size: 14px; }
 /* floating pill over the graph, centred like the GitKraken reference. z-index 3 keeps
    it above .diff-overlay (2) so ⌘F still works with a diff open. */
-.searchbar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 8px; background: var(--bg-selected); border: 1px solid var(--border); box-shadow: 0 3px 12px rgba(0,0,0,.35); animation: appear .12s ease-out; }
+/* Anchored to the start of the subject column, not centered: .graph-pane shrinks when the
+   commit panel opens, so a 50% center (or a right anchor) slid the bar sideways on every
+   selection change. Column widths only change when the user drags a splitter. */
+.searchbar { position: absolute; top: 8px; left: calc(var(--refs-w) + var(--graph-col-w) + 24px); z-index: 3; display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 8px; background: var(--bg-selected); border: 1px solid var(--border); box-shadow: 0 3px 12px rgba(0,0,0,.35); animation: appear .12s ease-out; }
 .searchbar input { width: 220px; padding: 3px 6px; background: var(--bg-panel); color: var(--fg); border: 1px solid var(--border); border-radius: 5px; font: inherit; }
 .searchbar .count { min-width: 78px; text-align: center; color: var(--fg-dim); font-size: 12px; }
 .searchbar button { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; padding: 3px 5px; background: none; border: none; color: var(--fg-dim); }
