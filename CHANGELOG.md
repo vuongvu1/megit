@@ -9,10 +9,20 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-05
+
 ### Added
 
 - The add-repo dialog lists up to 10 recent repositories. Ones already open are marked and
   clicking them switches to that tab; closing a tab keeps the repo in the list.
+
+### Changed
+
+- "Discard all" in the commit panel now discards only unstaged changes: tracked files go back to their staged content and untracked files are deleted, while anything staged survives. It previously reset both sides to HEAD, so staging a hunk you wanted to keep and discarding the rest threw away the part you had just protected. The button counts unstaged entries and does nothing when there are none.
+
+### Fixed
+
+- The search bar (<kbd>⌘F</kbd>) no longer slides sideways when the commit panel opens or closes. It was centred on `.graph-pane`, which shrinks with the panel, so a 50% anchor moved on every selection change; it is now pinned to the start of the subject column, which only moves when a splitter is dragged.
 
 ## [0.3.0] - 2026-08-01
 
