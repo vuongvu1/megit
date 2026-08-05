@@ -9,6 +9,12 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-05
+
+### Fixed
+
+- <kbd>Esc</kbd> closes the add-repo dialog. The dialog had no keyboard dismissal at all, so the only way out was the ✕ or a click on the backdrop.
+
 ## [0.4.0] - 2026-08-05
 
 ### Added
