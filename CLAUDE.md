@@ -59,7 +59,7 @@ End-to-end verification (build, launch, drive with Playwright, API curl probes):
 - Start every request on a fresh branch off `main`: `git checkout -b <feat|fix|docs|chore>/<slug>`. Uncommitted changes carry across, so a request already underway can be moved retroactively. Never let work pile up on `main`.
 - Do not run `git commit` or `git rm` — the user commits at task boundaries.
 - `~/.config/megit/config.json` is real user state. To drive the app without touching it (screenshots, probes), launch the server with an isolated `HOME`.
-- Design docs and implementation plans live in `docs/superpowers/{specs,plans}/`.
+- Design docs live in `docs/superpowers/specs/` — the *why* behind a feature, kept so decisions don't get re-litigated. Implementation plans are scratch: write them wherever, delete them once the feature ships.
 - Playwright MCP drops `.playwright-mcp/` artifacts into the CWD — keep them out of commits.
 - `scripts/make-test-repo.sh` regenerates `test-repo/`: interleaved branches, merges, two stashes, dirty worktree. It is also the source of the README screenshots.
 
