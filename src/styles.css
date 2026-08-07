@@ -360,3 +360,35 @@ button:hover { background: var(--border); }
 }
 /* hljs themes set an opaque .hljs background that hides d2h row tints */
 .d2h-wrapper .hljs { background: transparent; }
+
+/* mid-operation strip: sits between the toolbar and the panes so it can't be
+   scrolled away — being stuck in a rebase is not a detail you hunt for */
+.conflict-banner { display: flex; align-items: center; gap: 10px; padding: 6px 10px; flex-shrink: 0; background: var(--bg-wip); border-bottom: 1px solid var(--border); font-size: 12px; }
+.conflict-banner .cb-verb { font-weight: 600; }
+.conflict-banner .cb-label { color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
+.conflict-banner .cb-count { margin-left: auto; color: var(--fg-dim); }
+.conflict-banner button { padding: 3px 10px; font-size: 12px; }
+.conflict-banner button.danger { border-color: #e06c75; color: #e06c75; }
+.conflict-banner button.primary:not(:disabled) { background: var(--head-bg); color: var(--head-fg); border-color: var(--head-bg-hover); }
+.conflict-banner button:disabled { opacity: .5; cursor: default; }
+
+/* Resolver pane. Its own styles rather than DiffView's: DiffView renders through
+   diff2html and inherits that library's stylesheet, so there's nothing to share. */
+.cf-view { flex: 1; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; }
+.cf-progress { position: sticky; top: 0; z-index: 1; padding: 4px 10px; background: var(--bg-panel); border-bottom: 1px solid var(--border); color: var(--fg-dim); }
+.cf-view pre { margin: 0; padding: 0 10px; white-space: pre-wrap; word-break: break-word; }
+.cf-context { color: var(--fg-dim); }
+.cf-block { margin: 6px 0; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.cf-block.picked { border-color: var(--head-bg-hover); }
+.cf-bar { display: flex; align-items: center; gap: 6px; padding: 3px 8px; background: var(--bg-hover); border-bottom: 1px solid var(--border); }
+.cf-side-name { color: var(--fg-dim); margin-right: auto; }
+.cf-chosen { color: var(--head-fg); margin-right: auto; }
+.cf-bar button { padding: 2px 8px; font-size: 11px; }
+.cf-ours { background: color-mix(in srgb, #98c379 12%, transparent); }
+.cf-theirs { background: color-mix(in srgb, #61afef 12%, transparent); }
+.cf-mid { padding: 2px 8px; color: var(--fg-dim); border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }
+.cf-card { margin: 20px auto; max-width: 420px; padding: 16px; border: 1px solid var(--border); border-radius: 6px; text-align: center; font-family: inherit; }
+.cf-card-note { color: var(--fg-dim); margin-bottom: 12px; }
+.cf-card-actions { display: flex; gap: 8px; justify-content: center; }
+.cf-card-actions button.danger { border-color: #e06c75; color: #e06c75; }
+.diff-side.conflict { color: #e06c75; }

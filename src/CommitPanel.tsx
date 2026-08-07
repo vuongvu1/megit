@@ -108,7 +108,7 @@ function SectionHead({ label, count, shut, onToggle, children }: {
   count: number
   shut: boolean
   onToggle: () => void
-  children: React.ReactNode
+  children?: React.ReactNode // omitted by sections with no batch actions
 }) {
   return (
     <div className="section-head" onClick={onToggle} role="button" aria-expanded={!shut} tabIndex={0}
@@ -116,7 +116,7 @@ function SectionHead({ label, count, shut, onToggle, children }: {
       <span className={`caret${shut ? '' : ' open'}`}><ChevronIcon /></span>
       {label}
       <span className={`count${count ? '' : ' zero'}`}>{count}</span>
-      {count > 0 && <span className="head-actions" onClick={e => e.stopPropagation()}>{children}</span>}
+      {count > 0 && children && <span className="head-actions" onClick={e => e.stopPropagation()}>{children}</span>}
     </div>
   )
 }
@@ -175,7 +175,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
   // refetch mid-typing can't wipe what's in the composer
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
-  const [shut, setShut] = useState({ staged: false, unstaged: false })
+  const [shut, setShut] = useState({ staged: false, unstaged: false, conflicts: false })
 
   useEffect(() => {
     setError('')
@@ -395,6 +395,18 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
                 { Icon: PlusIcon, title: 'Stage', run: stage },
               ]}
               view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="Nothing to stage" />
+          )}
+          {/* last, and only while it has rows. No Stage or Discard on these rows —
+              clicking one opens the resolver, which is the only way through. */}
+          {sides.conflicts.length > 0 && (
+            <>
+              <SectionHead label="Merge Changes" count={sides.conflicts.length} shut={shut.conflicts}
+                onToggle={() => setShut(s => ({ ...s, conflicts: !s.conflicts }))} />
+              {!shut.conflicts && (
+                <FileList files={sides.conflicts} side="worktree" actions={[]}
+                  view={view} collapsed={collapsed} onToggle={onToggle} file={file} fileSide={fileSide} onFileSelect={onFileSelect} empty="No conflicts" />
+              )}
+            </>
           )}
         </div>
       ) : (

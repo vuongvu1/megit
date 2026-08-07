@@ -19,13 +19,20 @@ describe('splitStatus', () => {
     expect(unstaged.map(f => [f.path, f.status])).toEqual([['a.ts', 'M']])
   })
 
-  it('keeps conflicts unstaged only', () => {
-    const { staged, unstaged } = splitStatus([{ path: 'c.ts', status: 'U', x: '.', y: 'U' }])
+  it('puts conflicts in their own section, out of both other sides', () => {
+    // a conflict is neither staged nor unstaged, and it must not sit next to
+    // ordinary edits: those rows carry Stage, and staging a file still full of
+    // markers is the mistake this separation exists to prevent
+    const { staged, unstaged, conflicts } = splitStatus([
+      { path: 'c.ts', status: 'U', x: '.', y: 'U' },
+      { path: 'b.ts', status: 'M', x: '.', y: 'M' },
+    ])
     expect(staged).toEqual([])
-    expect(unstaged.map(f => f.status)).toEqual(['U'])
+    expect(unstaged.map(f => f.path)).toEqual(['b.ts'])
+    expect(conflicts.map(f => [f.path, f.status])).toEqual([['c.ts', 'U']])
   })
 
   it('ignores entries with no sides (commit file lists)', () => {
-    expect(splitStatus([{ path: 'a.ts', status: 'M' }])).toEqual({ staged: [], unstaged: [] })
+    expect(splitStatus([{ path: 'a.ts', status: 'M' }])).toEqual({ staged: [], unstaged: [], conflicts: [] })
   })
 })

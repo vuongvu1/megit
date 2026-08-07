@@ -6,7 +6,9 @@ import type { DiffSide } from './wip'
 import CommitPanel from './CommitPanel'
 import ThemeSwitch from './ThemeSwitch'
 import ActionBar from './ActionBar'
+import ConflictBanner from './ConflictBanner'
 import SearchBar from './SearchBar'
+import type { OpKind } from '../server/operation.ts'
 import { label, matchLocal, stepMatch } from './search'
 import { toastErr } from './Toast'
 
@@ -14,6 +16,9 @@ import { toastErr } from './Toast'
 // file is actually clicked; xterm.js + panel likewise until the terminal opens
 const DiffView = lazy(() => import('./DiffView'))
 const TerminalPanel = lazy(() => import('./TerminalPanel'))
+// its own chunk, not folded into DiffView's: opening a conflicted file must not
+// pull in diff2html + highlight.js, which are the reason DiffView is lazy at all
+const ConflictView = lazy(() => import('./ConflictView'))
 
 export type Selection = { kind: 'commit'; hash: string } | { kind: 'wip' } | null
 
@@ -37,11 +42,15 @@ const headFp = (commits: Commit[], stashes: StashEntry[] = []) =>
 // while `status` stays "M", so hashing only that made staging invisible to the panel
 // the branch header goes in too: a push changes nothing about the files, but leaves
 // the toolbar's ahead/behind badges stale if it doesn't reach setState
-const statusFp = (files: StatusEntry[], b: BranchHeader) =>
-  `${b.head}\x1f${b.upstream}\x1f${b.ahead}\x1f${b.behind}\n`
+// ...and so does the operation kind: an operation that ends without changing the
+// file list would otherwise never reach setState, leaving the banner up
+const statusFp = (files: StatusEntry[], b: BranchHeader, op: Operation | null) =>
+  `${b.head}\x1f${b.upstream}\x1f${b.ahead}\x1f${b.behind}\x1f${op?.kind ?? ''}\n`
   + files.map(f => `${f.x ?? ''}${f.y ?? ''}${f.status}${f.path}`).join('\n')
 
 const NO_BRANCH: BranchHeader = { head: null, upstream: null, ahead: 0, behind: 0 }
+
+type Operation = { kind: OpKind; label: string }
 
 export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string; onRemove: () => void; hasTerminal: boolean }) {
   const [commits, setCommits] = useState<Commit[]>([])
@@ -51,6 +60,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
   const [stashes, setStashes] = useState<StashEntry[]>([])
   const [status, setStatus] = useState<StatusEntry[]>([])
   const [branch, setBranch] = useState<BranchHeader>(NO_BRANCH)
+  const [operation, setOperation] = useState<Operation | null>(null)
   const [selection, setSelection] = useState<Selection>(null)
   // side is set only from the WIP panel's two sections — it picks which diff to show
   const [file, setFile] = useState<{ path: string; side?: DiffSide } | null>(null)
@@ -116,7 +126,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
     const limit = probe ? PAGE : Math.max(loaded.current, PAGE)
     return Promise.all([
       api<{ commits: Commit[]; hasMore: boolean; remotes: string[]; stashes: StashEntry[]; githubUrl: string | null }>(`/api/graph?${q}&limit=${limit}`),
-      api<{ files: StatusEntry[]; branch: BranchHeader }>(`/api/status?${q}`),
+      api<{ files: StatusEntry[]; branch: BranchHeader; operation: Operation | null }>(`/api/status?${q}`),
     ]).then(([gRes, s]) => {
       if (g !== gen.current) return // superseded by a newer request — latest wins
       inflight.current = false // spin stops at next iteration boundary, never mid-turn
@@ -144,11 +154,12 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
         }
       }
       const sb = s.branch ?? NO_BRANCH
-      const sf = statusFp(s.files, sb)
+      const sf = statusFp(s.files, sb, s.operation ?? null)
       if (fps.current.status !== sf) {
         fps.current.status = sf
         setStatus(s.files)
         setBranch(sb)
+        setOperation(s.operation ?? null)
       }
       // bump unconditionally: an unchanged status fingerprint doesn't mean the WIP
       // diff contents are unchanged (re-saving a modified file keeps status+path the
@@ -178,6 +189,15 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
     // finally waits on a thenable the callback returns, so this clears once refresh settles
     p.finally(() => refresh()).finally(() => setBusy(false))
   }, [refresh])
+
+  const conflicts = useMemo(() => status.filter(f => f.status === 'U').length, [status])
+  const conflictPost = useCallback((action: 'abort' | 'continue') => {
+    spinWhile(api(`/api/conflict?${q}`, jsonInit('POST', { action })).catch(e => toastErr(e.message)))
+  }, [q, spinWhile])
+  const onAbort = useCallback(() => {
+    // destructive: everything picked so far goes with it
+    if (confirm('Abort the operation in progress?\n\nAll conflict resolutions are discarded and the repo goes back to where it was.')) conflictPost('abort')
+  }, [conflictPost])
 
   // selection identity only changes on a real selection change (refresh returns
   // the same object when unchanged) — so this closes the diff exactly then
@@ -387,6 +407,9 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
           <ThemeSwitch />
         </div>
       </div>
+      {operation && (
+        <ConflictBanner op={operation} conflicts={conflicts} busy={busy} onAbort={onAbort} onContinue={() => conflictPost('continue')} />
+      )}
       <div className="panes" style={{ '--graph-w': selection ? `${graphPct}%` : '100%' } as CSSProperties}>
         <div className={busy ? 'graph-pane busy' : 'graph-pane'} style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
           <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} githubUrl={githubUrl} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} />
@@ -405,18 +428,27 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
           )}
           <div className="col-splitter" style={{ left: refsW + 9 }} onPointerDown={onSplitDown} onPointerMove={onRefsMove} />
           <div className="col-splitter" style={{ left: refsW + graphColW + 17 }} onPointerDown={onSplitDown} onPointerMove={onGraphColMove} />
-          {file && selection && (
-            <div className="diff-overlay">
-              <div className="diff-overlay-head">
-                <span className="file-path">{file.path}</span>
-                {file.side && <span className="diff-side">{file.side === 'staged' ? 'staged' : 'unstaged'}</span>}
-                <button className="diff-close" onClick={() => setFile(null)} title="Close diff">✕</button>
+          {file && selection && (() => {
+            // a conflicted file gets the resolver in the same slot the diff uses —
+            // the file list, the graph and the keyboard nav all keep working
+            const conflicted = status.some(f => f.path === file.path && f.status === 'U')
+            return (
+              <div className="diff-overlay">
+                <div className="diff-overlay-head">
+                  <span className="file-path">{file.path}</span>
+                  {conflicted
+                    ? <span className="diff-side conflict">conflicted</span>
+                    : file.side && <span className="diff-side">{file.side === 'staged' ? 'staged' : 'unstaged'}</span>}
+                  <button className="diff-close" onClick={() => setFile(null)} title="Close diff">✕</button>
+                </div>
+                <Suspense fallback={<div className="diffview empty">Loading…</div>}>
+                  {conflicted
+                    ? <ConflictView repo={repo} file={file.path} onResolved={() => { setFile(null); refresh() }} />
+                    : <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file.path} side={file.side} wipTick={wipTick} />}
+                </Suspense>
               </div>
-              <Suspense fallback={<div className="diffview empty">Loading…</div>}>
-                <DiffView repo={repo} hash={selection.kind === 'commit' ? selection.hash : null} file={file.path} side={file.side} wipTick={wipTick} />
-              </Suspense>
-            </div>
-          )}
+            )
+          })()}
         </div>
         {selection && (
           <>
