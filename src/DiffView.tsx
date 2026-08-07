@@ -5,6 +5,7 @@ import 'diff2html/bundles/css/diff2html.min.css'
 import { api } from './api'
 import { useTheme } from './theme'
 import { build, emit, gaps, parse, reveal, STEP, totalLines, type Dir, type Gap, type Model } from './diffExpand'
+import { diffMode, needsPatch } from './diffMode'
 
 type DiffResp = { diff?: string; tooLarge?: boolean; size?: number }
 
@@ -58,8 +59,6 @@ function decorate(root: HTMLElement, gapList: Gap[], split: boolean, onExpand: (
   }
 }
 
-const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|avif|ico|bmp)$/i
-
 // One side of an image diff. The blob endpoint 404s when the file didn't exist
 // on that side (added/deleted), which <img> reports as a load error.
 function ImagePane({ src, label }: { src: string; label: string }) {
@@ -80,15 +79,20 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
   const [resp, setResp] = useState<DiffResp | null>(null)
   const [error, setError] = useState('')
   const [split, setSplit] = useState(() => localStorage.getItem('megit-diff-split') === '1')
+  const [rich, setRich] = useState(() => localStorage.getItem('megit-diff-rich') !== '0')
   // set once a gap is expanded: the full-context diff plus which lines are shown
   const [model, setModel] = useState<Model | null>(null)
   const theme = useTheme()
   const ref = useRef<HTMLDivElement>(null)
 
-  const isImage = IMAGE_RE.test(file)
+  const mode = diffMode(file, rich)
+  const pickRich = (v: boolean) => {
+    setRich(v)
+    localStorage.setItem('megit-diff-rich', v ? '1' : '0')
+  }
 
   const load = (force = false, silent = false) => {
-    if (isImage) return
+    if (!needsPatch(file)) return
     setModel(null)
     lastDir.current = null
     if (!silent) {
@@ -115,8 +119,8 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
 
   const text = useMemo(() => (model ? emit(model) : resp?.diff), [model, resp])
   const gapList = useMemo(
-    () => (text && !plain ? gaps(parse(text), model ? totalLines(model) : Infinity) : []),
-    [text, plain, model],
+    () => (text && !plain && mode.body === 'text' ? gaps(parse(text), model ? totalLines(model) : Infinity) : []),
+    [text, plain, model, mode.body],
   )
 
   // a ref so decorate()'s click handlers see the current model without redrawing
@@ -138,6 +142,12 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
   }
 
   useEffect(() => {
+    // the expansion hint is consumed on every run, including the early return
+    // below: a hint set by a click whose full-context fetch is still in flight
+    // would otherwise survive a mode flip and offset a freshly remounted,
+    // empty pane to its bottom
+    const dir = lastDir.current
+    lastDir.current = null
     const el = ref.current
     if (!el || !text || plain) return
     const top = el.scrollTop
@@ -154,47 +164,68 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
     decorate(el, gapList, split, (g, d) => expandRef.current(g, d))
     // expanding upward inserts lines above the clicked gap; offsetting by the
     // height added keeps that gap where the user clicked it
-    el.scrollTop = lastDir.current && lastDir.current !== 'down' ? top + (el.scrollHeight - before) : top
-  }, [text, gapList, split, plain, theme])
+    el.scrollTop = dir && dir !== 'down' ? top + (el.scrollHeight - before) : top
+    // rich: switching to source mounts a fresh .diff-html, and the `!el` guard
+    // above means an effect that doesn't re-fire would leave it blank
+  }, [text, gapList, split, plain, theme, rich])
 
-  if (isImage) {
-    const q = (which: 'old' | 'new') => {
-      const p = new URLSearchParams({ repo, file, which, ...(hash ? { hash } : { t: String(wipTick) }), ...(side ? { side } : {}) })
-      return `/api/blob?${p}`
-    }
-    return (
-      <div className="diffview">
-        <div className="image-diff">
-          <ImagePane src={q('old')} label="Before" />
-          <ImagePane src={q('new')} label="After" />
+  const toolbar = (mode.richToggle || mode.splitToggle) && (
+    <div className="diff-toolbar">
+      {mode.richToggle && (
+        <div className="view-toggle">
+          <button className={rich ? 'active' : ''} aria-pressed={rich} onClick={() => pickRich(true)}>Rendered</button>
+          <button className={rich ? '' : 'active'} aria-pressed={!rich} onClick={() => pickRich(false)}>Source</button>
         </div>
-      </div>
-    )
-  }
-
-  if (error) return <div className="diffview error">{error}</div>
-  if (!resp) return <div className="diffview empty">Loading…</div>
-  if (resp.tooLarge) {
-    return (
-      <div className="diffview empty">
-        <div>
-          <div>Diff too large ({Math.round((resp.size ?? 0) / 1024)} KB)</div>
-          <button onClick={() => load(true)}>Show anyway</button>
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div className="diffview">
-      <div className="diff-toolbar">
+      )}
+      {mode.splitToggle && (
         <div className="view-toggle">
           <button className={split ? '' : 'active'} aria-pressed={!split} onClick={() => { setSplit(false); localStorage.setItem('megit-diff-split', '0') }}>Unified</button>
           <button className={split ? 'active' : ''} aria-pressed={split} onClick={() => { setSplit(true); localStorage.setItem('megit-diff-split', '1') }}>Split</button>
         </div>
-      </div>
-      {plain
-        ? <pre className="diff-plain">{text?.trim() || 'No changes'}</pre>
-        : <div ref={ref} className="diff-html" />}
+      )}
+    </div>
+  )
+
+  // every branch below sits in the same keyless child slot, so without a key
+  // React would match them by index/type and reuse one host DOM node across
+  // branches. diff2html writes into that node imperatively (innerHTML), which
+  // React doesn't own and won't clear, so a stale diff table would linger
+  // under the image panes or the too-large card. Distinct keys force a remount
+  // instead of a reuse.
+  const body = () => {
+    if (mode.body === 'image') {
+      const q = (which: 'old' | 'new') => {
+        const p = new URLSearchParams({ repo, file, which, ...(hash ? { hash } : { t: String(wipTick) }), ...(side ? { side } : {}) })
+        return `/api/blob?${p}`
+      }
+      return (
+        <div key="image" className="image-diff">
+          <ImagePane src={q('old')} label="Before" />
+          <ImagePane src={q('new')} label="After" />
+        </div>
+      )
+    }
+    if (error) return <div key="state" className="diff-state error">{error}</div>
+    if (!resp) return <div key="state" className="diff-state">Loading…</div>
+    if (resp.tooLarge) {
+      return (
+        <div key="state" className="diff-state">
+          <div>
+            <div>Diff too large ({Math.round((resp.size ?? 0) / 1024)} KB)</div>
+            <button onClick={() => load(true)}>Show anyway</button>
+          </div>
+        </div>
+      )
+    }
+    return plain
+      ? <pre className="diff-plain">{text?.trim() || 'No changes'}</pre>
+      : <div key="html" ref={ref} className="diff-html" />
+  }
+
+  return (
+    <div className="diffview">
+      {toolbar}
+      {body()}
     </div>
   )
 }

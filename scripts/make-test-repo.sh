@@ -39,6 +39,17 @@ w README.md "# starfield"                     ; commit "initial commit"         
 w src/index.ts "export const version = '0.1'" ; commit "add entry point"             02 11:30
 w package.json '{ "name": "starfield" }'      ; commit "add package manifest"        03 09:15
 
+# assets/star.svg exists to exercise the rich/source diff toggle: it is rendered
+# as a picture by default, and the interesting edits below are ones the picture
+# cannot show.
+f assets/star.svg <<'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <circle id="core" cx="16" cy="16" r="5" fill="#f5c542"/>
+  <path d="M16 2 L18 12 L28 16 L18 20 L16 30 L14 20 L4 16 L14 12 Z" fill="#ffffff"/>
+</svg>
+EOF
+commit "add star sprite" 03 10:00
+
 # ── feature/renderer: long-running, merges back ───────────────────────────────
 git checkout -qb feature/renderer
 f src/renderer.ts <<'EOF'
@@ -163,6 +174,19 @@ w src/particles.ts "// collision response"    ; commit "collision response"     
 
 git checkout -q main
 w docs/architecture.md "# Architecture"       ; commit "document architecture"       07 10:00
+
+# Two of these three edits are invisible in the rendered SVG — the id rename and
+# the one-digit fill change. Only the second star shows up in the picture. This
+# is the commit to open when checking that the source diff is reachable.
+f assets/star.svg <<'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <circle id="star-core" cx="16" cy="16" r="5" fill="#f5c53f"/>
+  <path d="M16 2 L18 12 L28 16 L18 20 L16 30 L14 20 L4 16 L14 12 Z" fill="#ffffff"/>
+  <path d="M26 4 L27 8 L31 9 L27 10 L26 14 L25 10 L21 9 L25 8 Z" fill="#9aa7b5"/>
+</svg>
+EOF
+commit "add a second star, tune the core" 07 11:00
+
 w src/index.ts "// boot the renderer"         ; commit "boot the renderer"           07 14:25
 
 # ── chore branch, never merged ────────────────────────────────────────────────
@@ -204,5 +228,18 @@ Profiler shows 3ms in draw() on the 4k-sprite scene.
 Most of it is the per-frame Map allocation — reuse it across frames.
 EOF
                                            # untracked
+
+# unstaged SVG edit: a role and a <title>, neither of which alters a single
+# rendered pixel. Open this from the WIP row to see why the source diff needs
+# to be reachable at all.
+cat > assets/star.svg <<'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img">
+  <title>Star sprite</title>
+  <circle id="star-core" cx="16" cy="16" r="5" fill="#f5c53f"/>
+  <path d="M16 2 L18 12 L28 16 L18 20 L16 30 L14 20 L4 16 L14 12 Z" fill="#ffffff"/>
+  <path d="M26 4 L27 8 L31 9 L27 10 L26 14 L25 10 L21 9 L25 8 Z" fill="#9aa7b5"/>
+</svg>
+EOF
+                                           # unstaged
 
 echo "test-repo ready: $(git log --oneline --all | wc -l | tr -d ' ') commits, $(git branch | wc -l | tr -d ' ') branches, $(git stash list | wc -l | tr -d ' ') stashes, dirty worktree"
