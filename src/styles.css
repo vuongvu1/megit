@@ -292,7 +292,8 @@ button:hover { background: var(--border); }
 
 .diffview { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; }
 .diffview.empty { align-items: center; justify-content: center; text-align: center; }
-.diff-toolbar { padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; justify-content: center; }
+.diff-state { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; }
+.diff-toolbar { padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; justify-content: center; gap: 8px; }
 .diff-toolbar button { padding: 3px 10px; }
 .view-toggle { display: inline-flex; }
 .view-toggle button { border-radius: 0; }
