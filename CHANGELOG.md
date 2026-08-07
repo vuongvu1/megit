@@ -9,12 +9,41 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-08
+
+### Added
+
+- Merge conflicts can be resolved inside megit. A merge, rebase, cherry-pick or revert that
+  stops on a conflict now shows a banner above the graph naming the operation and the number of
+  conflicts left, with Abort (confirmed first) and Continue (enabled once nothing is unmerged).
+  Conflicted files get their own "Merge Changes" section in the commit panel — no Stage and no
+  Discard, because staging a file that still holds `<<<<<<<` commits the markers — and opening
+  one replaces the diff with a picker: every conflict block renders ours above theirs with Use
+  ours / Use theirs / Use both / Reset. Deciding the last block writes the file and stages it.
+  Files with nothing to pick — binary, delete/modify, submodule — get Keep ours / Keep theirs /
+  Delete instead, and a file fixed by hand in the terminal can be accepted with Mark resolved.
+  Picks are held in the client and written only on full resolution, so Reset costs nothing and
+  the watcher stays quiet. Stash-pop conflicts get the picker but no banner: git leaves no state
+  file to detect and has no `--continue`.
+- A Rendered/Source toggle on `.svg` diffs. SVG is text rendered as a picture, which hides
+  exactly the edits worth reviewing — a changed `viewBox`, a renamed `id`, a `stroke-width`
+  tweak below visual threshold. Source mode shows the real patch with Unified/Split; the choice
+  is sticky across files and reloads. Raster images are deliberately excluded — their source
+  diff is `Binary files … differ`, a control that leads nowhere.
+
 ### Changed
 
 - The add-repo dialog is now two panes: recent repositories on the left, the current
   directory's path header and folder list on the right. Recent entries show just the
   repository name with a dot when it is already open and a highlight on the active one; folder
   rows carry a chevron, and the path header bolds the directory you are in.
+
+### Fixed
+
+- "Stage all" and "Discard all" no longer touch unmerged paths. `git add -A` swept conflicted
+  files — markers and all — into the index, and `git restore --worktree -- .` failed outright on
+  paths with no stage-0 entry to restore from, taking the whole batch with it. Both now exclude
+  every unmerged path by pathspec.
 
 ## [0.4.1] - 2026-08-05
 
@@ -139,7 +168,10 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — `node-pty` is an `optionalDependency` with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/vuongvu1/megit/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/vuongvu1/megit/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/vuongvu1/megit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vuongvu1/megit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vuongvu1/megit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vuongvu1/megit/releases/tag/v0.1.0
