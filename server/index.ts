@@ -2,17 +2,22 @@ import express from 'express'
 import type { RequestHandler } from 'express'
 import { execFile } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
-import { readFile, realpath } from 'node:fs/promises'
+import { readFile, realpath, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import { loadConfig, saveConfig, isPermutation, touchRecent, type Config } from './config.ts'
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
+import { pickOperation, STATE_FILES, type OpKind } from './operation.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal, hasPty } from './term.ts'
 
 const app = express()
-app.use(express.json())
+// 10mb, not the 100kb default: a resolved conflicted file goes back as a JSON
+// string, and a few thousand lines of source blows past the default. The GET
+// side refuses anything over DIFF_CAP, so the client can't assemble a body
+// larger than 1 MB.
+app.use(express.json({ limit: '10mb' }))
 
 // The server listens on loopback only, but that alone doesn't stop a page on
 // attacker.tld from rebinding its DNS to 127.0.0.1: the browser then treats this
@@ -231,12 +236,46 @@ app.get('/api/avatar', repoGuard, async (req, res) => {
   res.json({ url: await resolveAvatar(String(req.query.repo), email, git) })
 })
 
+type Operation = { kind: OpKind; label: string }
+
+// `git rev-parse` once per repo: .git is a file, not a directory, in linked
+// worktrees and submodules, so the path can't be assumed. Repos are registered
+// and long-lived, so caching keeps steady-state detection at zero git processes.
+const gitDirs = new Map<string, string>()
+async function gitDir(repo: string): Promise<string> {
+  let dir = gitDirs.get(repo)
+  if (!dir) {
+    dir = (await git(repo, ['rev-parse', '--absolute-git-dir'])).trim()
+    gitDirs.set(repo, dir)
+  }
+  return dir
+}
+
+// A short label for the banner, from files git already wrote — no extra process.
+async function opLabel(dir: string, kind: OpKind): Promise<string> {
+  const read = async (name: string) => (await readFile(join(dir, name), 'utf8').catch(() => '')).trim()
+  if (kind === 'merge') return (await read('MERGE_MSG')).split('\n')[0]
+  if (kind === 'cherry-pick') return (await read('CHERRY_PICK_HEAD')).slice(0, 7)
+  if (kind === 'revert') return (await read('REVERT_HEAD')).slice(0, 7)
+  return '' // rebase: the banner says "Rebasing" and stops there
+}
+
+async function readOperation(repo: string): Promise<Operation | null> {
+  const dir = await gitDir(repo)
+  const kind = pickOperation(STATE_FILES.filter(n => existsSync(join(dir, n))))
+  return kind ? { kind, label: await opLabel(dir, kind) } : null
+}
+
 app.get('/api/status', repoGuard, async (req, res) => {
   try {
     // --branch prepends the branch/upstream/ahead-behind headers to the output this
     // already parses — the toolbar's Pull/Push badges for no extra git process
     const raw = await git(String(req.query.repo), ['status', '--porcelain=v2', '-uall', '--branch', '-z'])
-    res.json({ files: parseStatus(raw), branch: parseBranchHeader(raw) })
+    res.json({
+      files: parseStatus(raw),
+      branch: parseBranchHeader(raw),
+      operation: await readOperation(String(req.query.repo)),
+    })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
   }
@@ -572,7 +611,10 @@ app.post('/api/wip', repoGuard, async (req, res) => {
         await git(repo, ['restore', '--staged', '--', (await mustBeDirty()).path])
         break
       case 'stage-all':
-        await git(repo, ['add', '-A'])
+        // conflicts excluded: a bare `git add -A` stages files that still have
+        // markers in them, which is the mistake the Merge Changes section exists
+        // to prevent — the batch button must not walk around it
+        await git(repo, ['add', '-A', '--', '.', ...await excludeUnmerged(repo)])
         break
       case 'unstage-all':
         await git(repo, ['restore', '--staged', '--', '.'])
@@ -589,7 +631,9 @@ app.post('/api/wip', repoGuard, async (req, res) => {
         // unstaged only: worktree back to the index, so staged content survives.
         // clean removes untracked files — a staged new file is tracked, so it stays.
         // No -x — ignored files (node_modules, .env) are not "changes".
-        await git(repo, ['restore', '--worktree', '--', '.'])
+        // Conflicts are excluded too: they have no stage-0 entry to restore from,
+        // so including one makes git fail the whole call.
+        await git(repo, ['restore', '--worktree', '--', '.', ...await excludeUnmerged(repo)])
         await git(repo, ['clean', '-fd'])
         break
       case 'stash': {
@@ -722,6 +766,85 @@ app.get('/api/diff', repoGuard, async (req, res) => {
     res.json({ diff })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
+  }
+})
+
+// git's own list of unmerged paths. Every conflict action checks against it
+// BEFORE touching the filesystem: `file` arrives from the client, and without
+// this check POST /api/conflict is an arbitrary-file-write primitive bounded
+// only by repoGuard. Paths from git can't traverse out of the repo; paths from
+// the client can. Do not reorder this behind a join() or a read.
+async function unmergedPaths(repo: string): Promise<string[]> {
+  const out = await git(repo, ['diff', '--name-only', '--diff-filter=U', '-z'])
+  return out.split('\0').filter(Boolean)
+}
+
+// Pathspecs that subtract the conflicted files from a whole-tree operation, for
+// the batch buttons that would otherwise stage or clobber a half-merged file.
+const excludeUnmerged = async (repo: string) =>
+  (await unmergedPaths(repo)).map(p => `:(exclude)${p}`)
+
+app.get('/api/conflict', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const file = String(req.query.file ?? '')
+  try {
+    if (!(await unmergedPaths(repo)).includes(file)) throw httpError(409, 'file is not conflicted')
+    // delete/modify where our side deleted it: nothing on disk, and nothing to
+    // pick — the client shows the whole-file card instead of a block list
+    const buf = await readFile(join(repo, file)).catch(() => null)
+    if (!buf) res.json({ missing: true })
+    else if (buf.length > DIFF_CAP) res.json({ tooLarge: true, size: buf.length })
+    else if (buf.includes(0)) res.json({ binary: true })
+    else res.json({ content: buf.toString('utf8') })
+  } catch (e) {
+    const err = e as Error
+    res.status((err as { status?: number }).status ?? 500).json({ error: err.message })
+  }
+})
+
+app.post('/api/conflict', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  const action = String(req.body.action ?? '')
+  try {
+    if (action === 'abort' || action === 'continue') {
+      const op = await readOperation(repo)
+      if (!op) throw httpError(409, 'no operation in progress')
+      // GIT_EDITOR=true: GIT_ENV deliberately sets no editor, and `--continue`
+      // opens one for the commit message — without this the request never
+      // returns. `--no-edit` won't do instead: `git rebase --continue` rejects it.
+      await git(repo, [op.kind, `--${action}`], [0], NET_TIMEOUT, { GIT_EDITOR: 'true' })
+      res.json({ ok: true })
+      return
+    }
+    const file = String(req.body.file ?? '')
+    // the security boundary — see unmergedPaths. Runs before any path is joined.
+    if (!(await unmergedPaths(repo)).includes(file)) throw httpError(409, 'file is not conflicted')
+    switch (action) {
+      case 'resolve': {
+        const content = req.body.content
+        if (typeof content !== 'string') throw httpError(400, 'content must be a string')
+        await writeFile(join(repo, file), content)
+        await git(repo, ['add', '--', file])
+        break
+      }
+      case 'ours':
+      case 'theirs':
+        // fails on a delete/modify conflict where that side has no version —
+        // the error reaches the toast, and Delete is the answer there
+        await git(repo, ['checkout', `--${action}`, '--', file])
+        await git(repo, ['add', '--', file])
+        break
+      case 'delete':
+        // -f: git rm refuses an unmerged path without it
+        await git(repo, ['rm', '-f', '--', file])
+        break
+      default:
+        throw httpError(400, `unknown action: ${action}`)
+    }
+    res.json({ ok: true })
+  } catch (e) {
+    const err = e as Error
+    res.status((err as { status?: number }).status ?? 409).json({ error: err.message })
   }
 })
 
