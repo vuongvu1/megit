@@ -13,37 +13,22 @@ surface, and the HTTP API may change in any minor release.
 
 ### Added
 
-- Merge conflicts can be resolved inside megit. A merge, rebase, cherry-pick or revert that
-  stops on a conflict now shows a banner above the graph naming the operation and the number of
-  conflicts left, with Abort (confirmed first) and Continue (enabled once nothing is unmerged).
-  Conflicted files get their own "Merge Changes" section in the commit panel — no Stage and no
-  Discard, because staging a file that still holds `<<<<<<<` commits the markers — and opening
-  one replaces the diff with a picker: every conflict block renders ours above theirs with Use
-  ours / Use theirs / Use both / Reset. Deciding the last block writes the file and stages it.
-  Files with nothing to pick — binary, delete/modify, submodule — get Keep ours / Keep theirs /
-  Delete instead, and a file fixed by hand in the terminal can be accepted with Mark resolved.
-  Picks are held in the client and written only on full resolution, so Reset costs nothing and
-  the watcher stays quiet. Stash-pop conflicts get the picker but no banner: git leaves no state
-  file to detect and has no `--continue`.
-- A Rendered/Source toggle on `.svg` diffs. SVG is text rendered as a picture, which hides
-  exactly the edits worth reviewing — a changed `viewBox`, a renamed `id`, a `stroke-width`
-  tweak below visual threshold. Source mode shows the real patch with Unified/Split; the choice
-  is sticky across files and reloads. Raster images are deliberately excluded — their source
-  diff is `Binary files … differ`, a control that leads nowhere.
+- Merge conflict resolution. A conflicted merge, rebase, cherry-pick or revert shows a banner
+  with Abort and Continue; conflicted files open a per-block picker (Use ours / theirs / both /
+  Reset) instead of a diff, and hand-fixed files take Mark resolved. Stash-pop conflicts get the
+  picker but no banner — git leaves no state to detect and has no `--continue`.
+- Rendered/Source toggle on `.svg` diffs, so a changed `viewBox`, `id` or `stroke-width` is
+  reviewable as text. Sticky across files; raster images stay excluded.
 
 ### Changed
 
-- The add-repo dialog is now two panes: recent repositories on the left, the current
-  directory's path header and folder list on the right. Recent entries show just the
-  repository name with a dot when it is already open and a highlight on the active one; folder
-  rows carry a chevron, and the path header bolds the directory you are in.
+- The add-repo dialog is two panes: recent repositories on the left, directory browser on the
+  right.
 
 ### Fixed
 
-- "Stage all" and "Discard all" no longer touch unmerged paths. `git add -A` swept conflicted
-  files — markers and all — into the index, and `git restore --worktree -- .` failed outright on
-  paths with no stage-0 entry to restore from, taking the whole batch with it. Both now exclude
-  every unmerged path by pathspec.
+- "Stage all" and "Discard all" skip unmerged paths. `git add -A` staged conflict markers, and
+  `git restore --worktree -- .` failed on paths with no stage-0 entry, killing the whole batch.
 
 ## [0.4.1] - 2026-08-05
 
@@ -60,38 +45,53 @@ surface, and the HTTP API may change in any minor release.
 
 ### Changed
 
-- "Discard all" in the commit panel now discards only unstaged changes: tracked files go back to their staged content and untracked files are deleted, while anything staged survives. It previously reset both sides to HEAD, so staging a hunk you wanted to keep and discarding the rest threw away the part you had just protected. The button counts unstaged entries and does nothing when there are none.
+- "Discard all" discards only unstaged changes — tracked files go back to their staged content,
+  untracked files are deleted, staged work survives. It previously reset both sides to HEAD,
+  throwing away the hunk you had just staged to protect.
 
 ### Fixed
 
-- The search bar (<kbd>⌘F</kbd>) no longer slides sideways when the commit panel opens or closes. It was centred on `.graph-pane`, which shrinks with the panel, so a 50% anchor moved on every selection change; it is now pinned to the start of the subject column, which only moves when a splitter is dragged.
+- The search bar (<kbd>⌘F</kbd>) no longer slides sideways when the commit panel opens. It was
+  centred on `.graph-pane`, which shrinks with the panel; it is now pinned to the subject column.
 
 ## [0.3.0] - 2026-08-01
 
 ### Added
 
-- Split terminal panes: <kbd>⌘D</kbd> (or the split button in the panel header) divides the terminal panel into up to four side-by-side shells, each its own PTY with its own scrollback. A pane goes away when its shell exits (`exit`, <kbd>⌃D</kbd>) or via the ✕ in its top-right corner, which kills the shell rather than orphaning it; closing the last one closes the panel. The layout is remembered per repository, so switching tabs and coming back reattaches every pane. The four-pane cap is enforced server-side, not just in the UI — the WebSocket spawns login shells, so an unbounded pane index would be an unbounded shell factory.
+- Split terminal panes: <kbd>⌘D</kbd> divides the terminal into up to four side-by-side shells,
+  each its own PTY and scrollback, remembered per repository. The four-pane cap is enforced
+  server-side — the WebSocket spawns login shells, so an unbounded pane index would be an
+  unbounded shell factory.
 
 ### Changed
 
-- The published package now requires Node ≥ 22 instead of ≥ 24, so `npx megit-app` no longer prints an `EBADENGINE` warning on Node 22 or 23. Node 24 was only ever needed to run `server/*.ts` directly in development; the package ships `dist-server/` compiled to ES2022, whose real floor is `import.meta.dirname` (Node 20.11). Development and CI stay on Node 24.
+- The package now requires Node ≥ 22 instead of ≥ 24, so `npx megit-app` no longer warns
+  `EBADENGINE` on Node 22 or 23. Node 24 was only needed to run `server/*.ts` in development.
 
 ### Fixed
 
-- A stash newer than every commit no longer sinks to its base commit's row. Stash placement snaps a stash down to its base when the first lane clear of solid graph lines sits more than one lane past the insertion row's own traffic — a guard against a stash square floating alone past the right edge. On a busy history that fired far too eagerly: a stash taken minutes ago landed eleven rows down, next to a day-old base. The guard now also keeps the chronological row whenever the clear lane fits inside the width the graph already draws, which is the width the original check was really about.
+- A stash newer than every commit no longer sinks to its base commit's row. The guard that
+  snaps a stash down to its base fired on any busy history — it now keeps the chronological row
+  whenever the clear lane fits inside the width the graph already draws.
 
 ## [0.2.0] - 2026-07-30
 
 ### Added
 
-- Merge and Rebase in the right-click menu of a remote branch chip, not only a local one. When a local branch has diverged from its upstream — a local commit here, a new commit on the remote — `origin/x` is drawn as its own chip, and that chip is exactly what you want to merge in or rebase onto. The actions address the branch by its full remote-tracking ref, so a diverged `origin/main` can never resolve to the local `main`.
-- A build badge in the top-right of the tab bar: `[DEV]` when running the Vite dev server, the package version (`v0.2.0`) in a production build. Baked in at build time, so it costs no request and the unused branch is dropped from the production bundle.
+- Merge and Rebase in the right-click menu of a remote branch chip, not only a local one. The
+  actions address the branch by its full remote-tracking ref, so a diverged `origin/main` can
+  never resolve to the local `main`.
+- A build badge in the tab bar: `[DEV]` under the Vite dev server, the package version in a
+  production build. Baked in at build time, so it costs no request.
 
 ### Fixed
 
-- Refresh (⟳ button and <kbd>r</kbd>) now fetches from the remote before re-reading the repository. It previously only read local git, so commits pushed by someone else — and the Pull/Push badge counts — stayed stale until you hit Pull. Auto-refresh over SSE and the initial load of a tab remain local-only, so neither costs a network round-trip; a fetch that fails is ignored and the local refresh still happens.
-- Ref chips are ordered branches-first, tags-last, instead of taking whatever order git listed them in. The sort is stable, so git's ordering still decides within each group.
-- The tab close button is a real 18×18 target with a hover ring and a `Close <repo>` label for screen readers, and its cross is an SVG rather than a `×` glyph — a text glyph is positioned from the font's baseline, so flex centring aligned its line box and left the visible ink off-centre.
+- Refresh (⟳ and <kbd>r</kbd>) fetches from the remote before re-reading the repository, so
+  commits pushed by someone else and the Pull/Push counts no longer stay stale. Auto-refresh and
+  initial tab load remain local-only; a failed fetch is ignored.
+- Ref chips are ordered branches-first, tags-last, instead of git's listing order.
+- The tab close button is a real 18×18 target with a hover ring and a `Close <repo>` label for
+  screen readers; its cross is an SVG, since a `×` glyph centres on its line box, not its ink.
 
 ## [0.1.0] - 2026-07-28
 
