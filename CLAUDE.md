@@ -69,6 +69,10 @@ Automated — see `CONTRIBUTING.md`. Merging to `main` publishes **only** when `
 
 When bumping a version, update `CHANGELOG.md` in the same change.
 
+Entries stay short and precise: one bullet per user-visible change, 1–3 lines, naming what
+changed and — only where it isn't obvious — why. Design rationale belongs in
+`docs/superpowers/specs/`, not the release notes.
+
 ## Architecture
 
 Two halves, no shared code except the shape of the JSON that crosses `/api`. **`docs/architecture.md` is the full account — read it before large changes, and update it rather than duplicating it here.**
