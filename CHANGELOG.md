@@ -9,6 +9,15 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-10
+
+### Changed
+
+- Express is gone; routing and static serving are now ~150 lines on `node:http`. A megit install
+  pulls 3 packages instead of 70, and the server starts in about half the time.
+- The `postinstall` script is gone. node-pty's `spawn-helper` is made executable on the first
+  terminal you open instead, so installing megit runs no scripts of its own.
+
 ## [0.5.0] - 2026-08-08
 
 ### Added

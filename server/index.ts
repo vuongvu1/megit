@@ -1,5 +1,4 @@
-import express from 'express'
-import type { RequestHandler } from 'express'
+import { createApp, serveStatic, type Handler } from './http.ts'
 import { execFile } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { readFile, realpath, writeFile } from 'node:fs/promises'
@@ -12,12 +11,11 @@ import { pickOperation, STATE_FILES, type OpKind } from './operation.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal, hasPty } from './term.ts'
 
-const app = express()
-// 10mb, not the 100kb default: a resolved conflicted file goes back as a JSON
-// string, and a few thousand lines of source blows past the default. The GET
-// side refuses anything over DIFF_CAP, so the client can't assemble a body
-// larger than 1 MB.
-app.use(express.json({ limit: '10mb' }))
+// JSON bodies are capped at 10mb by createApp — a resolved conflicted file goes
+// back as a JSON string, and a few thousand lines of source blows past a smaller
+// limit. The GET side refuses anything over DIFF_CAP, so the client can't
+// assemble a body larger than 1 MB.
+const app = createApp()
 
 // The server listens on loopback only, but that alone doesn't stop a page on
 // attacker.tld from rebinding its DNS to 127.0.0.1: the browser then treats this
@@ -63,7 +61,7 @@ function git(repo: string, args: string[], okCodes: number[] = [0], timeout = 0,
   })
 }
 
-const repoGuard: RequestHandler = (req, res, next) => {
+const repoGuard: Handler = (req, res, next) => {
   const repo = String(req.query.repo ?? '')
   if (!loadConfig().repos.includes(repo)) {
     res.status(400).json({ error: 'unknown repo' })
@@ -917,17 +915,13 @@ app.get('/api/blob', repoGuard, async (req, res) => {
 })
 
 const dist = join(import.meta.dirname, '..', 'dist')
-if (existsSync(dist)) {
-  app.use(express.static(dist))
-  app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(dist, 'index.html')))
-}
+if (existsSync(dist)) app.fallback(serveStatic(dist))
 
 const port = Number(process.env.PORT) || 3411
 
 // exported so bin/megit.js can wait for 'listening' before opening the browser.
-// The banner hangs off the 'listening' event rather than app.listen's callback:
-// express 5 runs that callback even when the bind failed, which would announce a
-// URL that never came up.
+// The banner hangs off the 'listening' event rather than a listen callback, which
+// can fire even when the bind failed and would announce a URL that never came up.
 export const server = app.listen(port, '127.0.0.1')
 server.on('listening', () => console.log(`megit API on http://127.0.0.1:${port}`))
 server.on('error', (e: NodeJS.ErrnoException) => {

@@ -10,7 +10,7 @@ Nothing leaves your machine: the server binds `127.0.0.1`, shells out to your ow
 
 ## Getting started
 
-Requires Node ≥ 22. The package is 1.7 MB, with `express` and `ws` as its only runtime dependencies.
+Requires Node ≥ 22. The package is 1.7 MB, with `ws` as its only runtime dependency and no install scripts.
 
 **Run it once, without installing:**
 
@@ -140,7 +140,7 @@ Requires Node ≥ 24 and pnpm — a development-only floor, since the server run
 
 ```bash
 pnpm install
-pnpm dev        # Express API on :4500 + Vite dev server on :4000
+pnpm dev        # API on :4500 + Vite dev server on :4000
 ```
 
 Production build:

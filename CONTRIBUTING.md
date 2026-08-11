@@ -6,7 +6,7 @@ Node ≥ 24 and pnpm. The server runs TypeScript directly via Node's native type
 
 ```bash
 pnpm install
-pnpm dev        # Express API on :4500 + Vite dev server on :4000 (proxies /api)
+pnpm dev        # API on :4500 + Vite dev server on :4000 (proxies /api)
 ```
 
 With nvm, `nvm use` does not persist across shells — `.nvmrc` pins 24.

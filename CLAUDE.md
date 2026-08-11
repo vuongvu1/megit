@@ -15,7 +15,7 @@ Every change is judged against it. Concretely:
 - Keep the main bundle lean — heavy dependencies (xterm.js is the precedent) go in lazy `React.lazy`/dynamic-`import()` chunks; server-side natives (node-pty) load via dynamic `import()` on first use. Nothing may cost anything until the user actually uses it.
 - `/api/graph` must stay fast on 10k+-commit repos. Commits page in at 200 per request (server default and client floor) — don't raise it without measuring.
 - Avoid re-renders: RepoView gates `setState` behind fingerprint comparison; keep that pattern for new data flows.
-- Client-only deps belong in `devDependencies` — Vite inlines them into `dist/`. Runtime `dependencies` is deliberately just express + ws (+ optional node-pty).
+- Client-only deps belong in `devDependencies` — Vite inlines them into `dist/`. Runtime `dependencies` is deliberately just ws (+ optional node-pty); routing/static serving is `server/http.ts` on `node:http`. Adding a runtime dep means adding its whole transitive tree to every user's install — justify it against writing the few lines instead.
 - Measure before claiming: `curl -w '%{time_total}'` on API routes, `pnpm build` chunk sizes, DOM row counts / `performance.getEntriesByType` in the browser. Verify against a big repo (`~/WORKSPACE/BLS/bikeleasing-app`, 14k commits — register temporarily, then remove from config).
 
 ## Requirements & commands
@@ -29,7 +29,7 @@ export PATH="$HOME/.nvm/versions/node/v24.16.0/bin:$PATH"
 Package manager is pnpm.
 
 ```bash
-pnpm dev                    # Express API on :4500 + Vite dev server on :4000 (proxies /api)
+pnpm dev                    # API on :4500 + Vite dev server on :4000 (proxies /api)
 pnpm test                   # vitest — pure modules, parsers, watcher
 pnpm test -- lanes          # single test file by name filter
 npx tsc --noEmit            # typecheck
@@ -46,7 +46,8 @@ End-to-end verification (build, launch, drive with Playwright, API curl probes):
 
 - **Dev runs TypeScript directly; publishing cannot.** Node refuses to type-strip files under `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), so `server/` is compiled to `dist-server/` by `prepublishOnly`. Never assume the raw `.ts` server ships.
 - **`fs.watch` on a missing path behaves three ways**: macOS and Windows throw ENOENT, Linux returns a watcher that never fires and never errors. `subscribe()` checks `existsSync` itself so the contract is identical everywhere — don't delegate that to `fs.watch`.
-- **Express 5 runs the `app.listen(port, host, cb)` callback even when the bind fails** (`server.listening === false`). Hang startup logging off the `'listening'` event instead.
+- **Hang startup logging off the server's `'listening'` event**, never a `listen()` callback — a callback can fire on a failed bind (`server.listening === false`) and announce a URL that never came up.
+- **Never answer a request while its body is still uploading** (`server/http.ts` body cap). Closing the socket with unread data queues a TCP reset, and a reset may discard the response along with it — the client gets ECONNRESET/EPIPE and no status. Drain to `'end'` first, then reply. It passes locally and fails on CI, because the outcome is pure timing.
 - **vitest excludes `test-repo/`** (`vite.config.ts`) — the generated fixture contains a plausible `test/renderer.test.ts` that would otherwise join the real suite.
 - **Watcher integration tests are skipped on Windows** — a real recursive `fs.watch` kills the vitest worker with no output. Windows auto-refresh is therefore unverified.
 - **`npx megit-app` fails with `sh: megit: command not found` when run from anywhere inside this repo.** A bare name is a `*` range to npm, which matches the repo's own root package, so npx decides it's already installed, skips the cache install, and never adds a bin dir to PATH (`libnpmexec/lib/index.js` — line 56 returns the local node, so line 306's `binPaths.push` is skipped). Smoke-test with `node bin/megit.js` or `npx megit-app@latest` instead. Not a user-facing bug.
