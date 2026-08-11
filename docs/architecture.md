@@ -18,7 +18,7 @@ There is no ORM, no state library, and no shared model layer. The server produce
 
 ## Server
 
-**Plain Express, no bundling.** `index.ts` defines every route and shells out to `git` through an `execFile` helper with a 50 MB buffer. In development Node runs the TypeScript directly via native type-stripping; `pnpm build:server` compiles it to `dist-server/` only for publishing, because Node refuses to strip types under `node_modules`.
+**Plain `node:http`, no bundling and no web framework.** `http.ts` is a ~150-line stand-in for the slice of Express this server used — exact-path routing, JSON bodies, static files with an ETag, and an SPA fallback that never swallows an unknown `/api` path. Express did the same job, but it pulled 67 transitive packages into every install, most of them one-function modules untouched for years; on a tool people point at their own repositories that install surface costs more than the framework was worth. `index.ts` defines every route and shells out to `git` through an `execFile` helper with a 50 MB buffer. In development Node runs the TypeScript directly via native type-stripping; `pnpm build:server` compiles it to `dist-server/` only for publishing, because Node refuses to strip types under `node_modules`.
 
 **Every repo-scoped route passes through `repoGuard`**, which rejects any path not registered in `~/.config/megit/config.json`. See [SECURITY.md](../SECURITY.md) for why that, the `Host` pin, and the rev allow-list exist.
 

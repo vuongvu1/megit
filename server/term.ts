@@ -1,6 +1,7 @@
 import type { Server } from 'node:http'
-import { existsSync } from 'node:fs'
+import { chmodSync, existsSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import { WebSocketServer, WebSocket } from 'ws'
 import { loadConfig } from './config.ts'
 
@@ -51,9 +52,34 @@ export function termKey(repo: string, pane: string | null): string | null {
   return `${repo}\0${p}`
 }
 
+// node-pty ships spawn-helper as a prebuilt binary, and some package managers drop
+// the executable bit when extracting the tarball — the terminal then fails to spawn.
+// This ran as a postinstall script until an install script proved to be the kind of
+// supply-chain surface scanners flag on sight; it costs nothing to do it here, once,
+// on the first shell. Resolve node-pty rather than guessing ./node_modules: under
+// `npx` it is hoisted to the installing project's node_modules, not ours.
+let helperFixed = false
+function fixSpawnHelper() {
+  if (helperFixed) return
+  helperFixed = true
+  try {
+    const prebuilds = join(dirname(createRequire(import.meta.url).resolve('node-pty/package.json')), 'prebuilds')
+    for (const platform of readdirSync(prebuilds)) {
+      try {
+        chmodSync(join(prebuilds, platform, 'spawn-helper'), 0o755)
+      } catch {
+        // win32 prebuilds have no spawn-helper; nothing to do
+      }
+    }
+  } catch {
+    // node-pty is optional — absent on Linux installs without build tools
+  }
+}
+
 async function getSession(key: string, repo: string): Promise<Session> {
   const existing = sessions.get(key)
   if (existing) return existing
+  fixSpawnHelper()
   // dynamic import: the native module never loads until a terminal is actually opened
   const { spawn } = await import('node-pty')
   const shell = process.env.SHELL || '/bin/sh'

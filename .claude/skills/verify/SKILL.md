@@ -20,7 +20,7 @@ When done, kill **only that PID**: `kill $(cat /tmp/megit-verify.pid)`.
 
 Server only mounts `dist/` static serving if it exists **at startup** — restart after first build. Frontend changes need `pnpm build` + hard reload (hashed asset names, no cache issue).
 
-Dev mode alternative: `pnpm dev` (Express on 3411 + Vite on 5173 with /api proxy).
+Dev mode alternative: `pnpm dev` (API on 3411 + Vite on 5173 with /api proxy).
 
 ## Drive it
 
