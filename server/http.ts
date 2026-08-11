@@ -67,16 +67,26 @@ function readBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((ok, fail) => {
     const chunks: Buffer[] = []
     let size = 0
+    let over = false
     req.on('data', (c: Buffer) => {
       size += c.length
-      // pause rather than destroy: the 413 still has to reach the client, and
-      // node closes the socket itself once a response finishes with an unread
-      // request body. Destroying here resets the connection mid-response instead.
-      if (size > BODY_LIMIT) { req.pause(); fail(Object.assign(new Error('request entity too large'), { status: 413 })) }
-      else chunks.push(c)
+      if (over) return
+      if (size > BODY_LIMIT) {
+        // Past the cap: drop what was buffered and swallow the rest. Answering
+        // now instead would mean closing the socket with an upload still in
+        // flight, and that close is a TCP reset — which is allowed to discard
+        // the 413 along with it, leaving the client an ECONNRESET (or an EPIPE
+        // on its next write) and no status at all. Reading to the end costs
+        // constant memory and buys a clean FIN with the response intact.
+        chunks.length = 0
+        over = true
+        return
+      }
+      chunks.push(c)
     })
     req.on('error', fail)
     req.on('end', () => {
+      if (over) return fail(Object.assign(new Error('request entity too large'), { status: 413 }))
       if (!chunks.length) return ok({})
       try { ok(JSON.parse(Buffer.concat(chunks).toString('utf8'))) }
       catch { fail(Object.assign(new Error('invalid JSON body'), { status: 400 })) }
@@ -148,12 +158,10 @@ export function createApp() {
       // rejection that takes the process down; so does this
       const err = e as Error & { status?: number }
       if (res.headersSent) { res.end(); return }
-      // an over-cap body is still arriving and will never be read; leaving the
-      // connection alive would stall every later request pipelined onto it
-      if (err.status === 413) {
-        res.setHeader('Connection', 'close')
-        res.on('finish', () => req.socket?.destroy())
-      }
+      // a client that overshot the cap gets its connection retired rather than
+      // parked for reuse. Safe only because the body was drained to the end
+      // first — closing with an upload still in flight is a reset, not a FIN.
+      if (err.status === 413) res.setHeader('Connection', 'close')
       res.status(err.status ?? 500).json({ error: err.message })
     }
   }

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { AddressInfo } from 'node:net'
+import { connect, type AddressInfo } from 'node:net'
 import { createApp, serveStatic } from './http.ts'
 
 const dist = mkdtempSync(join(tmpdir(), 'megit-http-'))
@@ -96,6 +96,39 @@ describe('body', () => {
     await expect(
       post({ headers: { 'content-type': 'application/json' }, body }).then(r => r.status),
     ).resolves.toBe(413)
+  })
+
+  // The 413 is only useful if the client actually receives it. Answering while an
+  // upload is still in flight closes the socket with a TCP reset, and a reset may
+  // discard the response with it — the client then sees ECONNRESET (or EPIPE on
+  // its next write) and no status. Raw socket because fetch hides the distinction:
+  // it reports both a clean close and a reset as "fetch failed".
+  it('delivers the 413 on a clean close, not a reset', async () => {
+    const TOTAL = 12 * 1024 * 1024
+    const outcome = await new Promise<{ how: string; status: string }>(resolve => {
+      let received = ''
+      let sent = 0
+      let settled = false
+      const finish = (v: { how: string; status: string }) => { if (!settled) { settled = true; resolve(v) } }
+      const sock = connect((server.address() as AddressInfo).port, '127.0.0.1', () => {
+        sock.write(`POST /api/echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: ${TOTAL}\r\n\r\n`)
+        // exactly Content-Length bytes: overshooting makes node parse the excess
+        // as a second request and answer its own 400
+        const pump = () => {
+          while (sent < TOTAL && !sock.destroyed) {
+            const n = Math.min(256 * 1024, TOTAL - sent)
+            sent += n
+            if (!sock.write(Buffer.alloc(n, 'x'))) return
+          }
+        }
+        sock.on('drain', pump)
+        pump()
+      })
+      sock.on('data', d => { received += d.toString() })
+      sock.on('end', () => finish({ how: 'fin', status: received.split('\r\n')[0] }))
+      sock.on('error', e => finish({ how: 'reset', status: (e as NodeJS.ErrnoException).code ?? 'error' }))
+    })
+    expect(outcome).toEqual({ how: 'fin', status: 'HTTP/1.1 413 Payload Too Large' })
   })
 })
 
