@@ -1,5 +1,7 @@
 # <img src="public/logo.svg" width="28"/> megit
 
+[![npm](https://img.shields.io/npm/v/megit-app)](https://www.npmjs.com/package/megit-app) [![CI](https://github.com/vuongvu1/megit/actions/workflows/ci.yml/badge.svg)](https://github.com/vuongvu1/megit/actions/workflows/ci.yml) [![Socket](https://badge.socket.dev/npm/package/megit-app/latest)](https://socket.dev/npm/package/megit-app)
+
 A git repository viewer that runs in your browser. Commit graph with real branch lanes, diffs including your uncommitted work, stashes, staging, search, and a shell — pointed at as many local repos as you like, each in its own tab.
 
 It writes, too: stage/unstage/discard, commit and amend, branch and tag create/delete, stash push/pop/drop, checkout (with auto-stash when the worktree is dirty), plus revert, reset, cherry-pick, merge, rebase, pull and push.
