@@ -9,6 +9,19 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-12
+
+### Fixed
+
+- Ubuntu Mono is bundled instead of fetched from Google Fonts. Every page load used to
+  hand your IP and User-Agent to a third party, and the UI fell back to a system font
+  when offline — neither matched what the README promised.
+
+### Changed
+
+- README now states that avatar lookups reach `api.github.com` (with your `gh` token,
+  when present) as well as Gravatar. That was already true and undocumented.
+
 ## [0.5.1] - 2026-08-10
 
 ### Changed

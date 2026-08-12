@@ -6,13 +6,11 @@ A git repository viewer that runs in your browser. Commit graph with real branch
 
 It writes, too: stage/unstage/discard, commit and amend, branch and tag create/delete, stash push/pop/drop, checkout (with auto-stash when the worktree is dirty), plus revert, reset, cherry-pick, merge, rebase, pull and push.
 
-Nothing leaves your machine: the server binds `127.0.0.1`, shells out to your own `git`, and has no account, telemetry, or network dependency beyond optional Gravatar avatars.
-
 ![megit — commit graph with branch lanes, stash rows and the sticky WIP row](docs/graph-dark.png)
 
 ## Getting started
 
-Requires Node ≥ 22. The package is 1.7 MB, with `ws` as its only runtime dependency and no install scripts.
+Requires Node ≥ 22. The package is 1.8 MB, with `ws` as its only runtime dependency and no install scripts.
 
 **Run it once, without installing:**
 

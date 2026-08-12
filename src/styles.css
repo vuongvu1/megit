@@ -1,3 +1,32 @@
+/* Self-hosted rather than loaded from Google Fonts: megit's whole pitch is that
+   nothing leaves your machine, and a stylesheet link handed the user's IP and
+   User-Agent to a third party on every page load — and left the app unstyled
+   offline, which is a normal way to run a local git viewer. Latin subset only
+   (~36 KB for all three faces); other scripts fall through to the
+   `ui-monospace, monospace` stack every rule already declares.
+   Ubuntu Mono by Dalton Maag, Ubuntu Font Licence 1.0 — see fonts/LICENSE.txt. */
+@font-face {
+  font-family: 'Ubuntu Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ubuntu-mono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Ubuntu Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/ubuntu-mono-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Ubuntu Mono';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ubuntu-mono-400-italic.woff2') format('woff2');
+}
+
 :root {
   --bg: #1e2228;
   --bg-panel: #23272e;
