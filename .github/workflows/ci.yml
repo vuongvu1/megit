@@ -42,3 +42,9 @@ jobs:
       # Smoke-test the real published entrypoint. This is what would have caught
       # ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING before it shipped.
       - run: node bin/megit.js --version
+
+      # The daemon can only be checked by running it: `start` verifies the server
+      # answers before reporting success, and `stop` fails loudly if the state file
+      # it wrote doesn't lead back to a live megit.
+      - run: node bin/megit.js start
+      - run: node bin/megit.js stop

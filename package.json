@@ -1,6 +1,6 @@
 {
   "name": "megit-app",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Git repository viewer in the browser: commit graph with branch lanes, diffs, stashes and WIP",
   "license": "MIT",
   "author": "Hoang Vuong Vu",
