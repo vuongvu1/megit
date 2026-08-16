@@ -12,22 +12,20 @@ It writes, too: stage/unstage/discard, commit and amend, branch and tag create/d
 
 Requires Node ≥ 22. The package is 1.8 MB, with `ws` as its only runtime dependency and no install scripts.
 
-**Run it once, without installing:**
-
 ```bash
 npx megit-app
 ```
 
-**Or install it, and run `megit` from anywhere:**
+That starts the server on port 3411 — set `PORT` to change that — and opens your browser at it. <kbd>Ctrl</kbd><kbd>C</kbd> stops it.
+
+**To keep it running after you close the terminal:**
 
 ```bash
-npm i -g megit-app
-megit
+npx megit-app start
+npx megit-app stop
 ```
 
-Upgrade later with `npm i -g megit-app@latest`.
-
-Either way the server starts on port 3411 — set `PORT` to change that — and opens your browser at it.
+Or install it once with `npm i -g megit-app` and run `megit`, `megit start` and `megit stop` from anywhere; upgrade later with `npm i -g megit-app@latest`.
 
 <sub>The package is `megit-app`; `megit` on npm is unrelated, so keep the `-app`. The installed command is still `megit`.</sub>
 
