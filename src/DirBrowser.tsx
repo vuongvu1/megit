@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, jsonInit } from './api'
 import type { Config } from './App'
 
@@ -16,6 +16,7 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
 }) {
   const [dir, setDir] = useState<FsDir | null>(null)
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
 
   const load = (path?: string) => {
     setError('')
@@ -28,6 +29,13 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [onClose])
+
+  // Matches the full path, not just the basename: two checkouts of the same repo
+  // are only distinguishable by their parent directories.
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return q ? recent.filter(r => r.toLowerCase().includes(q)) : recent
+  }, [recent, query])
 
   const pick = (path: string) =>
     api<Config>('/api/repos', jsonInit('POST', { path })).then(onPicked).catch(e => setError(e.message))
@@ -47,8 +55,15 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
         {recent.length > 0 && (
           <div className="picker-pane picker-recent">
             <div className="modal-label">Recent</div>
+            <input
+              className="recent-filter"
+              placeholder="Search…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              autoFocus
+            />
             <ul className="dirlist">
-              {recent.map(r => (
+              {shown.map(r => (
                 <li key={r} className={r === active ? 'sel' : ''}>
                   <span className="dirname" title={r} onClick={() => openRecent(r)}>{base(r)}</span>
                   {open.includes(r) && <span className="recent-dot" title="open" />}

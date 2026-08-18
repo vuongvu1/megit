@@ -9,11 +9,11 @@ describe('touchRecent', () => {
     expect(touchRecent(['a', 'b', 'c'], 'c')).toEqual(['c', 'a', 'b'])
   })
   it('caps the list, dropping the least recent', () => {
-    const ten = Array.from({ length: 10 }, (_, i) => `r${i}`)
-    const out = touchRecent(ten, 'new')
-    expect(out).toHaveLength(10)
+    const full = Array.from({ length: 12 }, (_, i) => `r${i}`)
+    const out = touchRecent(full, 'new')
+    expect(out).toHaveLength(12)
     expect(out[0]).toBe('new')
-    expect(out).not.toContain('r9')
+    expect(out).not.toContain('r11')
   })
 })
 
