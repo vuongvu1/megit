@@ -23,7 +23,7 @@ export function saveConfig(c: Config): void {
 
 // MRU: most recent first, deduped, capped. The cap is what keeps the config file
 // from growing without bound as repos come and go.
-export function touchRecent(recent: string[], path: string, limit = 10): string[] {
+export function touchRecent(recent: string[], path: string, limit = 12): string[] {
   return [path, ...recent.filter(r => r !== path)].slice(0, limit)
 }
 

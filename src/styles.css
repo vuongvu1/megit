@@ -107,6 +107,7 @@ button:hover { background: var(--border); }
 .picker-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .picker-recent { flex: none; width: 240px; border-right: 1px solid var(--border); background: var(--bg-tab); }
 .picker-recent .dirlist li.sel { background: var(--bg-selected); }
+.recent-filter { margin: 2px 12px 4px; padding: 3px 6px; background: var(--bg-panel); color: var(--fg); border: 1px solid var(--border); border-radius: 5px; font: inherit; min-width: 0; }
 .recent-dot { width: 6px; height: 6px; border-radius: 50%; background: #2ea043; flex-shrink: 0; }
 .dir-chevron { color: var(--fg-faint); cursor: pointer; padding-left: 8px; }
 
