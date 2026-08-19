@@ -9,6 +9,17 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-19
+
+### Added
+
+- A search box filters the recent-repositories list in the picker. It matches the full
+  path, not just the folder name, so two checkouts of the same repo stay distinguishable.
+
+### Changed
+
+- The recent-repositories list keeps 12 entries instead of 10.
+
 ## [0.6.0] - 2026-08-16
 
 ### Added
@@ -201,7 +212,8 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — node-pty is an optionalDependency with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/vuongvu1/megit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/vuongvu1/megit/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/vuongvu1/megit/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/vuongvu1/megit/compare/v0.5.0...v0.5.1
