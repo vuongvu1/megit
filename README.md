@@ -25,6 +25,8 @@ npx megit-app start
 npx megit-app stop
 ```
 
+`start` restarts a server that is already running, so a fresh version takes effect.
+
 Or install it once with `npm i -g megit-app` and run `megit`, `megit start` and `megit stop` from anywhere; upgrade later with `npm i -g megit-app@latest`.
 
 <sub>The package is `megit-app`; `megit` on npm is unrelated, so keep the `-app`. The installed command is still `megit`.</sub>

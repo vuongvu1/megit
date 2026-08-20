@@ -9,6 +9,12 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Changed
+
+- `megit start` now restarts a server that is already running instead of reporting
+  "already running", so an upgraded version actually takes effect. It also replaces a
+  server running on another port rather than refusing to start.
+
 ## [0.8.0] - 2026-08-20
 
 ### Added

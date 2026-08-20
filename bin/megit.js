@@ -16,7 +16,7 @@ if (cmd === '-h' || cmd === '--help') {
 
 Usage:
   megit            run in this terminal
-  megit start      run in the background
+  megit start      run in the background (restarts it if already running)
   megit stop       stop the background server
 
 Options:
@@ -68,17 +68,28 @@ const megitAnswers = async p => {
   }
 }
 
+// A dead process frees its port immediately, but `process.kill` returns before
+// the exit has happened — spawning the replacement first would race the bind.
+const waitForExit = async pid => {
+  for (let i = 0; i < 50 && pidAlive(pid); i++) await new Promise(r => setTimeout(r, 100))
+  return !pidAlive(pid)
+}
+
 if (cmd === 'start') {
   const prev = readState()
+  // `start` restarts rather than no-ops: after `npm i -g megit-app@latest` the old
+  // process is still the old version, and reporting "already running" would leave
+  // the upgrade silently unapplied. ponytail: one daemon is tracked, so a running
+  // server is replaced whatever port it is on — key the state file by port if
+  // anyone actually wants two.
   if (prev && pidAlive(prev.pid) && (await megitAnswers(prev.port))) {
-    // ponytail: one daemon is tracked, so a second PORT is a conflict rather than
-    // a second server. Key the state file by port if anyone actually wants two.
-    if (prev.port === port) {
-      console.log(`megit already running → http://127.0.0.1:${prev.port}`)
-      process.exit(0)
+    process.kill(prev.pid, 'SIGTERM')
+    rmSync(stateFile, { force: true })
+    if (!(await waitForExit(prev.pid))) {
+      console.error(`megit: server on http://127.0.0.1:${prev.port} (PID ${prev.pid}) did not stop`)
+      process.exit(1)
     }
-    console.error(`megit: already running on http://127.0.0.1:${prev.port} — run 'megit stop' first`)
-    process.exit(1)
+    console.log(`megit: restarting (was on http://127.0.0.1:${prev.port})`)
   }
 
   mkdirSync(dir, { recursive: true })
