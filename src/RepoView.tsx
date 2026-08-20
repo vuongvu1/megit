@@ -389,7 +389,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
             </svg>
           </button>
         </div>
-        <ActionBar repo={repo} commits={commits} branch={branch} remotes={remotes} stashes={stashes} dirty={status.length > 0} onBusy={spinWhile} />
+        <ActionBar repo={repo} commits={commits} branch={branch} remotes={remotes} stashes={stashes} dirty={status.length > 0} busy={busy} onBusy={spinWhile} />
         <div className="tb-right">
           {hasTerminal && (
             <button

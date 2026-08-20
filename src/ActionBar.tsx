@@ -47,13 +47,14 @@ const TITLES: Record<ToolbarAction, string> = {
   undo: 'Undo last commit — keeps its changes staged',
 }
 
-export default function ActionBar({ repo, commits, branch, remotes, stashes, dirty, onBusy }: {
+export default function ActionBar({ repo, commits, branch, remotes, stashes, dirty, busy, onBusy }: {
   repo: string
   commits: Commit[]
   branch: BranchHeader
   remotes: string[]
   stashes: StashEntry[]
   dirty: boolean
+  busy: boolean
   onBusy: (p: Promise<unknown>) => void
 }) {
   // HEAD's own row, detached included ("HEAD" without an arrow) — a branch can be
@@ -114,7 +115,7 @@ export default function ActionBar({ repo, commits, branch, remotes, stashes, dir
           <button
             key={b.action}
             className="tb-btn"
-            disabled={!!b.disabled}
+            disabled={busy || !!b.disabled}
             title={b.disabled ?? TITLES[b.action]}
             onClick={() => run(b.action)}
           >
