@@ -463,6 +463,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
               canAmend={selection?.kind === 'commit' && selection.hash === headCommit?.hash}
               isStash={selection?.kind === 'commit' && stashes.some(s => s.hash === selection.hash)}
               branch={headCommit?.refs.find(r => r.startsWith('HEAD -> '))?.slice(8) ?? null}
+              head={headCommit?.hash ?? null}
               // amend rewrites the sha and commit makes a new one: either way follow the
               // selection there, or the refresh drops it as a commit that no longer exists
               onCommitted={hash => { setSelection({ kind: 'commit', hash }); refresh() }}

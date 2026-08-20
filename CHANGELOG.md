@@ -9,6 +9,14 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Added
+
+- An **Amend last commit** checkbox in the commit composer rewrites the tip instead of
+  adding a commit — staged changes fold in and the message is prefilled from the commit
+  being rewritten, so its body can't be dropped unseen. It warns that the sha changes,
+  refuses mid-merge/rebase and on a detached HEAD, and asks again before rewriting a
+  commit a remote already has.
+
 ## [0.7.0] - 2026-08-19
 
 ### Added
