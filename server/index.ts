@@ -285,6 +285,15 @@ async function revParse(repo: string, ref: string): Promise<string | null> {
   return out.trim() || null
 }
 
+// Remote branches that already contain this sha. Rewriting such a commit leaves the
+// remote needing a force push, which megit never does — so both amend paths ask first.
+async function pushedTo(repo: string, sha: string): Promise<string[]> {
+  return (await git(repo, ['branch', '-r', '--contains', sha]))
+    .split('\n').map(s => s.trim())
+    // drop the "origin/HEAD -> origin/main" symref line: it's a pointer, not a second branch
+    .filter(r => r && !r.includes(' -> '))
+}
+
 // Uncommitted work goes to a stash before anything that moves the worktree, so no
 // path can fail on (or silently carry over) a dirty tree. Returns whether it stashed.
 async function stashIfDirty(repo: string, why: string): Promise<boolean> {
@@ -552,12 +561,7 @@ app.post('/api/commit', repoGuard, async (req, res) => {
         const message = String(req.body.message ?? '').trim()
         if (!message) throw httpError(400, 'empty commit message')
         if (req.body.force !== true) {
-          // rewriting a pushed commit leaves the remote needing a force push, which
-          // megit never does — so the client has to ask again before this proceeds
-          const onRemote = (await git(repo, ['branch', '-r', '--contains', sha]))
-            .split('\n').map(s => s.trim())
-            // drop the "origin/HEAD -> origin/main" symref line: it's a pointer, not a second branch
-            .filter(r => r && !r.includes(' -> '))
+          const onRemote = await pushedTo(repo, sha)
           if (onRemote.length) throw httpError(409, `already pushed to ${onRemote.join(', ')}`)
         }
         // --only: a plain --amend folds whatever is staged into the rewritten commit,
@@ -653,9 +657,24 @@ app.post('/api/wip', repoGuard, async (req, res) => {
       case 'commit': {
         const message = String(req.body.message ?? '').trim()
         if (!message) throw httpError(400, 'empty commit message')
+        const amend = req.body.amend === true
+        if (amend) {
+          // amend rewrites HEAD, so there has to be a HEAD, and a branch to move
+          if (!(await git(repo, ['branch', '--show-current'])).trim()) throw httpError(409, 'detached HEAD — check out a branch first')
+          const head = await revParse(repo, 'HEAD')
+          if (!head) throw httpError(409, 'no commit to amend')
+          // mid-merge/rebase the staged tree belongs to the operation in progress:
+          // folding it into the previous commit would swallow that commit whole
+          const op = await readOperation(repo)
+          if (op) throw httpError(409, `${op.kind} in progress — finish it first`)
+          if (req.body.force !== true) {
+            const onRemote = await pushedTo(repo, head)
+            if (onRemote.length) throw httpError(409, `already pushed to ${onRemote.join(', ')}`)
+          }
+        }
         // hooks run as they would in a terminal — this commit has real content —
         // but a hook that blocks on stdin gets killed rather than wedging the request
-        await git(repo, ['commit', `--message=${message}`], [0], NET_TIMEOUT)
+        await git(repo, amend ? ['commit', '--amend', `--message=${message}`] : ['commit', `--message=${message}`], [0], NET_TIMEOUT)
         res.json({ ok: true, hash: (await git(repo, ['rev-parse', 'HEAD'])).trim() })
         return
       }

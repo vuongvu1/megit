@@ -92,7 +92,7 @@ megit started as a viewer, but the common operations are here:
 - **Toolbar** — pull (fast-forward only), push, create branch, stash all, pop latest stash, undo last commit (soft reset, keeps changes staged)
 - **Ref chips** — checkout, create branch here, rename, delete, set upstream, merge, rebase, delete tag, copy name, copy GitHub link
 - **Commit rows** — checkout, cherry-pick, revert, reset (soft / mixed / hard), copy hash, copy GitHub link
-- **Files** — stage, unstage, discard, amend the last commit's message
+- **Files** — stage, unstage, discard, commit, amend the last commit (message, staged changes, or both)
 
 Checkout auto-stashes a dirty worktree first. Destructive items are marked as such and are hidden where they'd be meaningless.
 

@@ -9,6 +9,19 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-20
+
+### Added
+
+- An **Amend last commit** checkbox in the commit composer folds staged changes into the
+  tip and prefills its message. Refuses mid-merge or on a detached HEAD, and asks again
+  before rewriting a commit a remote already has.
+
+### Fixed
+
+- Toolbar actions are disabled while an operation is in flight, so a second click can't
+  fire a git command on top of the running one.
+
 ## [0.7.0] - 2026-08-19
 
 ### Added
@@ -212,7 +225,8 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — node-pty is an optionalDependency with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/vuongvu1/megit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/vuongvu1/megit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/vuongvu1/megit/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/vuongvu1/megit/compare/v0.5.1...v0.5.2

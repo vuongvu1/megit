@@ -9,6 +9,13 @@ import { splitStatus, type DiffSide } from './wip'
 const STATUS_COLOR: Record<string, string> = { M: '#e5c07b', A: '#98c379', D: '#e06c75', R: '#61afef', '?': '#98c379', U: '#e06c75' }
 const COUNT_LABEL: [string, string, string][] = [['M', 'modified', '#e5c07b'], ['A', 'added', '#98c379'], ['D', 'deleted', '#e06c75'], ['R', 'renamed', '#61afef'], ['U', 'conflicted', '#e06c75']]
 
+// Rewriting a commit a remote already has would need a force push, which megit won't
+// do — so it takes a second, explicit yes. Anything else rethrows to the error line.
+const confirmRewrite = (err: Error) => {
+  if (!/already pushed/.test(err.message)) throw err
+  return confirm(`This commit is ${err.message}.\n\nRewriting it changes its sha, so the remote would need a force push — which megit won't do for you.\n\nRewrite anyway?`)
+}
+
 const fmtWhen = (unix: number) =>
   new Date(unix * 1000).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
@@ -151,7 +158,7 @@ function FileList({ files, side, actions, view, collapsed, onToggle, file, fileS
   )
 }
 
-export default function CommitPanel({ repo, selection, status, file, fileSide, onFileSelect, canAmend, isStash, branch, onCommitted, onChanged }: {
+export default function CommitPanel({ repo, selection, status, file, fileSide, onFileSelect, canAmend, isStash, branch, head, onCommitted, onChanged }: {
   repo: string
   selection: Selection
   status: StatusEntry[]
@@ -161,6 +168,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
   canAmend: boolean // selection is the tip of the checked-out branch
   isStash: boolean // selection is a stash commit — its message is editable too
   branch: string | null // checked-out branch, for default stash messages
+  head: string | null // tip of the checked-out branch — the commit the composer can amend
   onCommitted: (hash: string) => void
   onChanged: () => void // staged/discarded — refetch, selection stays put
 }) {
@@ -175,6 +183,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
   // refetch mid-typing can't wipe what's in the composer
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [amend, setAmend] = useState(false)
   const [shut, setShut] = useState({ staged: false, unstaged: false, conflicts: false })
 
   useEffect(() => {
@@ -183,6 +192,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
     setMeta(null)
     setCollapsed(new Set())
     setDraft(null)
+    setAmend(false)
     if (selection?.kind !== 'commit') return
     api<{ files: StatusEntry[]; meta: CommitMeta }>(`/api/commit?repo=${encodeURIComponent(repo)}&hash=${selection.hash}`)
       .then(r => { setFetched(r.files); setMeta(r.meta) })
@@ -216,6 +226,8 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
       return next
     })
 
+  // amend has something to write with nothing staged: the message alone is a change
+  const canCommit = !!msg.trim() && (amend || sides.staged.length > 0)
   const [subject, ...body] = (meta?.message ?? '').split('\n')
   const bodyText = body.join('\n').trim()
   const coAuthored = meta && (meta.committer !== meta.author || meta.committerEmail !== meta.authorEmail)
@@ -250,11 +262,41 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
     const message = prompt(`Stash ${scope} changes as`, `${scope === 'staged' ? 'Staged' : 'Unstaged'} changes on ${branch ?? 'HEAD'}`)
     if (message !== null) wipPost({ action: 'stash', scope, message }, 'Stash', onChanged)
   }
-  const commit = () =>
-    wipPost({ action: 'commit', message: msg.trim() }, 'Commit', r => {
-      setMsg('')
-      if (r.hash) onCommitted(r.hash)
-    })
+  const commit = () => {
+    const message = msg.trim()
+    if (!amend) {
+      wipPost({ action: 'commit', message }, 'Commit', r => {
+        setMsg('')
+        if (r.hash) onCommitted(r.hash)
+      })
+      return
+    }
+    const post = (force: boolean) =>
+      api<{ hash?: string }>(`/api/wip?repo=${encodeURIComponent(repo)}`, jsonInit('POST', { action: 'commit', message, amend: true, force }))
+    setBusy(true)
+    setError('')
+    post(false)
+      .catch((err: Error) => (confirmRewrite(err) ? post(true) : null))
+      .then(r => {
+        if (!r) return
+        setMsg('')
+        setAmend(false)
+        if (r.hash) onCommitted(r.hash)
+      })
+      .catch((err: Error) => setError(`Amend failed: ${err.message}`))
+      .finally(() => setBusy(false))
+  }
+
+  // checking Amend loads the message being rewritten, so the box shows what is about
+  // to be replaced rather than dropping the commit's body without ever showing it.
+  // A message already typed wins — it's the one the user came here to write.
+  const toggleAmend = (on: boolean) => {
+    setAmend(on)
+    if (!on || !head) return
+    api<{ meta: CommitMeta }>(`/api/commit?repo=${encodeURIComponent(repo)}&hash=${head}`)
+      .then(r => setMsg(m => (m.trim() ? m : r.meta.message)))
+      .catch((err: Error) => setError(`Read last commit failed: ${err.message}`))
+  }
 
   const save = () => {
     if (selection.kind !== 'commit') return
@@ -278,13 +320,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
     setSaving(true)
     setError('')
     post(false)
-      .catch((err: Error) => {
-        // amending a pushed commit is a second, explicit decision
-        if (!/already pushed/.test(err.message)) throw err
-        return confirm(`This commit is ${err.message}.\n\nEditing it rewrites its sha, so the remote would need a force push — which megit won't do for you.\n\nEdit anyway?`)
-          ? post(true)
-          : null
-      })
+      .catch((err: Error) => (confirmRewrite(err) ? post(true) : null))
       .then(r => { if (r) { setDraft(null); onCommitted(r.hash) } })
       .catch((err: Error) => setError(`Edit message failed: ${err.message}`))
       .finally(() => setSaving(false))
@@ -347,15 +383,28 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
             disabled={busy}
             onChange={e => setMsg(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && sides.staged.length && msg.trim()) commit()
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCommit) commit()
             }}
           />
           <div className="msg-actions">
-            <span className="msg-hint">{sides.staged.length ? '⌘↵ to commit' : ''}</span>
-            <button className="primary" onClick={commit} disabled={busy || !msg.trim() || !sides.staged.length}>
-              Commit{sides.staged.length ? ` ${sides.staged.length}` : ''}
+            {/* no amend mid-merge: the staged tree there belongs to the operation,
+                and folding it into the previous commit would swallow that commit */}
+            {head && !sides.conflicts.length && (
+              <label className="amend-toggle">
+                <input type="checkbox" checked={amend} disabled={busy} onChange={e => toggleAmend(e.target.checked)} />
+                Amend last commit
+              </label>
+            )}
+            <span className="msg-hint">{canCommit ? '⌘↵' : ''}</span>
+            <button className="primary" onClick={commit} disabled={busy || !canCommit}>
+              {amend ? 'Amend' : 'Commit'}{sides.staged.length ? ` ${sides.staged.length}` : ''}
             </button>
           </div>
+          {amend && (
+            <div className="amend-warn">
+              Rewrites {head?.slice(0, 7)} — its sha changes{sides.staged.length ? ` and the ${sides.staged.length} staged change${sides.staged.length > 1 ? 's' : ''} fold in` : ''}. A commit that is already pushed would need a force push.
+            </div>
+          )}
         </div>
       )}
       <div className="files-head">

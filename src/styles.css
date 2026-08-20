@@ -288,6 +288,9 @@ button:hover { background: var(--border); }
 /* mirrors .commit-msg: top of the panel, divider below, never squeezed by the list */
 .composer { padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .composer .msg-box { min-height: 56px; }
+.amend-toggle { display: flex; align-items: center; gap: 5px; flex-shrink: 0; color: var(--fg-dim); font-size: 12px; cursor: pointer; }
+.amend-toggle input { margin: 0; cursor: pointer; }
+.amend-warn { margin-top: 6px; color: #e5c07b; font-size: 12px; line-height: 1.4; }
 /* stage/unstage: only on the hovered or selected row, so the list stays quiet */
 .row-action { visibility: hidden; }
 .row-action:first-of-type { margin-left: auto; }
