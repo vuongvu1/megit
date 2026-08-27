@@ -33,6 +33,8 @@ const graphFp = (commits: Commit[], hasMore: boolean, stashes: StashEntry[] = []
 
 // One page, the server's own default and the client's paging step.
 const PAGE = 200
+// Shortest gap between two refreshes triggered by returning to the tab.
+const VIS_REFRESH_MS = 10_000
 // Probe fingerprint for a silent refresh: the first page plus the stash list, which
 // arrives whole at any limit. No hasMore — a one-page probe always reports more
 // while 150 rows are loaded, and that difference isn't a change in the repo.
@@ -206,16 +208,18 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
   // "HEAD -> name" only: a detached HEAD shows as plain "HEAD" and has no tip to amend
   const headCommit = commits.find(c => c.refs.some(r => r.startsWith('HEAD -> ')))
 
-  // auto-refresh: SSE signal → refetch; hidden tab defers to one refetch on return.
+  // auto-refresh: SSE signal → silent refetch; a hidden tab skips it and does a full,
+  // visible refresh on return — event or not, since a background tab can have its SSE
+  // connection throttled or dropped, so "no event arrived" doesn't mean "nothing changed".
   // refresh's identity only changes with q (both derive from the stable `repo` prop —
   // App remounts RepoView by key), so these deps never tear down the connection on their own.
   useEffect(() => {
     const es = new EventSource(`/api/events?${q}`)
-    let dirty = false
     let firstOpen = true
+    // mount already fetched — don't fetch again if the tab regains focus right after
+    let lastVis = performance.now()
     const kick = () => {
-      if (document.visibilityState === 'hidden') { dirty = true; return }
-      refresh(true)
+      if (document.visibilityState !== 'hidden') refresh(true)
     }
     es.onmessage = kick
     es.onopen = () => {
@@ -224,7 +228,14 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
       kick()
     }
     const onVis = () => {
-      if (document.visibilityState === 'visible' && dirty) { dirty = false; refresh(true) }
+      if (document.visibilityState !== 'visible') return
+      // the full refresh the button does — spinner and remote fetch, so coming back to
+      // the tab shows upstream commits and *looks* like it refreshed. Rate-limited: a
+      // user alt-tabbing in and out must not fire a `git fetch` per flip.
+      // ponytail: fixed 10 s window, not a real throttle — enough for hand-speed flipping
+      if (performance.now() - lastVis < VIS_REFRESH_MS) return
+      lastVis = performance.now()
+      refresh()
     }
     document.addEventListener('visibilitychange', onVis)
     return () => { es.close(); document.removeEventListener('visibilitychange', onVis) }

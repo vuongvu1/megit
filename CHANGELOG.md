@@ -11,6 +11,9 @@ surface, and the HTTP API may change in any minor release.
 
 ### Changed
 
+- Returning to the megit browser tab runs a full refresh — spinner and remote fetch, at most
+  once every 10 seconds. A background tab can have its event stream throttled or dropped, so
+  waiting for a change event was not enough.
 - `megit start` now restarts a server that is already running instead of reporting
   "already running", so an upgraded version actually takes effect. It also replaces a
   server running on another port rather than refusing to start.
