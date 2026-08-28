@@ -4,8 +4,8 @@
 
 | Version | Supported |
 | --- | --- |
-| 0.1.x | yes |
-| < 0.1 | no |
+| 0.8.x | yes |
+| < 0.8 | no |
 
 ## Reporting a vulnerability
 
@@ -34,3 +34,19 @@ The boundary megit defends is **the browser**: a web page you happen to have ope
 - **There is no authentication.** Anything that can already run code as your user on your machine can talk to the server, and the terminal panel is a full shell with your privileges. On a shared or multi-user machine, treat a running megit as equivalent to an open terminal. Don't run it on a host you don't trust the local users of.
 - **megit runs your git, with your config.** Hooks, aliases, `core.fsmonitor`, credential helpers — all of it applies. Opening a repository is as safe, or unsafe, as running `git log` in it.
 - **Write operations are real.** Reset, rebase, force-delete and discard do what they say. Destructive items are marked in the UI, but there is no undo beyond git's own reflog.
+
+## Dependency alerts
+
+megit's runtime dependency tree is three packages: `ws`, plus the optional `node-pty` and its own `node-addon-api`. Everything else — React, Vite, xterm.js, diff2html — is a `devDependency` that Vite inlines into `dist/` at build time and never installs on a user's machine. That is deliberate, and it means supply-chain scanners have very little to report.
+
+What they do report is mostly a description of what megit is. A git GUI with an embedded terminal genuinely uses **shell access**, **filesystem access**, **environment variable access** and **native code** (the PTY binding), and it genuinely runs an **install script** (`node-gyp` building that binding). `node-pty` loads through a dynamic `import()` so it costs nothing until you open the terminal, which also shows up as **dynamic require**. **Network access** in megit itself is the Gravatar lookup described above; in the dependencies it is `ws`, which is a WebSocket library. None of these are findings so much as an accurate inventory.
+
+The one class worth spelling out is [Socket](https://socket.dev/npm/package/megit-app)'s `gptAnomaly`, "AI-detected potential code anomaly", because the name suggests more than the contents. As of 0.8.0 it reports three instances, all in dependency files and none in megit's own code:
+
+- `ws` → `lib/event-target.js`. Socket's own analysis text concludes it is a standard EventTarget mixin with "no suspicious patterns such as dynamic code execution, hardcoded secrets, or network activity".
+- `node-addon-api` → `tools/clang-format.js`, reached transitively through `node-pty`. Socket's text again concludes it is a "legitimate formatting helper" with no malicious behaviour. It is a repo tooling script that never executes at runtime.
+- `node-pty` → `deps/winpty/misc/FontSurvey.cc`. This one is a real command injection — argv interpolated into `sprintf` and handed to `system()` — in a vendored Windows console debugging tool. The file is not referenced by `node-pty`'s `binding.gyp`, so it is never compiled and never ships as a binary; it is dead source in the tarball. It is gone in `node-pty` 1.2.0, which drops winpty entirely, and megit will pick that up when 1.2.0 leaves beta.
+
+Clearing the first two from megit's side would mean dropping `ws` for a hand-rolled RFC 6455 implementation, and clearing the third would mean dropping the terminal. Neither trade is worth making for findings whose own evidence says they are benign.
+
+If you find a dependency alert that *isn't* covered above, please report it — through the advisory form if it looks exploitable, or as a normal issue if you just want it triaged.
