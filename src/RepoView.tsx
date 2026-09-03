@@ -241,6 +241,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
     return () => { es.close(); document.removeEventListener('visibilitychange', onVis) }
   }, [q, refresh])
 
+  // Listed in shortcuts.ts for the Settings dialog — change one, change both.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // TEXTAREA as well as INPUT: the commit-message editor is a textarea, and

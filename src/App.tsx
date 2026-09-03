@@ -4,6 +4,7 @@ import TabBar from './TabBar'
 import DirBrowser from './DirBrowser'
 import RepoView from './RepoView'
 import Toasts from './Toast'
+import Settings from './SettingsDialog'
 
 // hasTerminal is server-reported: node-pty is optional and has no Linux prebuild
 export type Config = { repos: string[]; activeRepo: string | null; recent: string[]; hasTerminal: boolean }
@@ -33,6 +34,7 @@ class Boundary extends Component<{ children: ReactNode }, { err: Error | null }>
 export default function App() {
   const [cfg, setCfg] = useState<Config | null>(null)
   const [browsing, setBrowsing] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => { api<Config>('/api/config').then(setCfg) }, [])
   if (!cfg) return null
@@ -54,7 +56,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <TabBar repos={cfg.repos} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} onReorder={reorder} onReorderEnd={reorderEnd} />
+      <TabBar repos={cfg.repos} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} onReorder={reorder} onReorderEnd={reorderEnd} onSettings={() => setSettingsOpen(true)} />
       {browsing && (
         <DirBrowser
           recent={cfg.recent}
@@ -65,6 +67,7 @@ export default function App() {
           onClose={() => setBrowsing(false)}
         />
       )}
+      {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
       {cfg.activeRepo
         ? (
           <Boundary key={cfg.activeRepo}>

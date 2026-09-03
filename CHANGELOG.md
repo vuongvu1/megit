@@ -9,6 +9,19 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-03
+
+### Added
+
+- A **Settings** dialog in a cog button at the end of the tab bar: font, app zoom, theme,
+  default diff view, an author avatars toggle (stops GitHub/Gravatar lookups when off),
+  and a shortcut reference.
+
+### Changed
+
+- The version tag moved from the right end of the tab bar to beside the logo, making room
+  for the new settings cog.
+
 ## [0.9.0] - 2026-08-28
 
 ### Changed
@@ -236,7 +249,8 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — node-pty is an optionalDependency with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/vuongvu1/megit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/vuongvu1/megit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/vuongvu1/megit/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/vuongvu1/megit/compare/v0.6.0...v0.7.0
