@@ -104,6 +104,13 @@ The server watches each open repository (`fs.watch`, filtered and debounced) and
 
 Auto-refresh only ever reads local git, so commits pushed by someone else stay invisible until something fetches. <kbd>r</kbd> and the ⟳ button therefore fetch from the remote first, then refresh — that is the one path that surfaces new upstream commits and refreshes the Pull/Push badges. A fetch that fails (offline, no remote) is ignored and the local refresh still happens.
 
+### Settings
+
+The cog at the right end of the tab bar opens font (bundled Ubuntu Mono, your system
+monospace, or your system UI face), text size in four steps from 80% to 140%, the theme, the default diff
+view, and a toggle for author avatars — off stops the GitHub and Gravatar lookups megit
+otherwise makes per commit author. The same dialog lists every keyboard shortcut below.
+
 ### Keyboard
 
 | Key                                                      | Action                             |
@@ -114,6 +121,7 @@ Auto-refresh only ever reads local git, so commits pushed by someone else stay i
 | <kbd>r</kbd>                                             | fetch from remote, then refresh    |
 | <kbd>⌘</kbd><kbd>J</kbd>                                 | toggle terminal                    |
 | <kbd>⌘</kbd><kbd>K</kbd>                                 | clear terminal                     |
+| <kbd>⌘</kbd><kbd>D</kbd>                                 | split terminal pane                |
 | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>0</kbd>                     | toggle theme                       |
 | <kbd>⌘</kbd><kbd>↵</kbd>                                 | commit                             |
 | <kbd>Esc</kbd>                                           | close search or menu / cancel edit |

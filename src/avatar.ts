@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api'
+import { useSetting } from './settingsStore'
 
 // email -> avatar URL, or null when nothing resolves (fall back to initials)
 const cache = new Map<string, string | null>()
@@ -35,9 +36,12 @@ async function probe(repo: string, email: string): Promise<string | null> {
 }
 
 export function useAvatar(repo: string, email: string | null): string | null {
+  // Off means no request at all, not a hidden image: this is the only outbound
+  // traffic megit makes, and initials are already the fallback downstream.
+  const avatars = useSetting('avatars')
   const [url, setUrl] = useState(() => (email ? cache.get(email) ?? null : null))
   useEffect(() => {
-    if (!email) return
+    if (!email || !avatars) return
     if (cache.has(email)) {
       setUrl(cache.get(email)!)
       return
@@ -54,8 +58,8 @@ export function useAvatar(repo: string, email: string | null): string | null {
       if (live) setUrl(u)
     })
     return () => { live = false }
-  }, [repo, email])
-  return email ? url : null
+  }, [repo, email, avatars])
+  return email && avatars ? url : null
 }
 
 export const initials = (name: string) =>

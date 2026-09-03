@@ -4,6 +4,7 @@ import { ColorSchemeType } from 'diff2html/lib/types'
 import 'diff2html/bundles/css/diff2html.min.css'
 import { api } from './api'
 import { useTheme } from './theme'
+import { useSetting, setSetting } from './settingsStore'
 import { build, emit, gaps, parse, reveal, STEP, totalLines, type Dir, type Gap, type Model } from './diffExpand'
 import { diffMode, needsPatch } from './diffMode'
 
@@ -78,7 +79,7 @@ function ImagePane({ src, label }: { src: string; label: string }) {
 export default function DiffView({ repo, hash, file, side, wipTick }: { repo: string; hash: string | null; file: string; side?: 'staged' | 'worktree'; wipTick: number }) {
   const [resp, setResp] = useState<DiffResp | null>(null)
   const [error, setError] = useState('')
-  const [split, setSplit] = useState(() => localStorage.getItem('megit-diff-split') === '1')
+  const split = useSetting('diffSplit')
   const [rich, setRich] = useState(() => localStorage.getItem('megit-diff-rich') !== '0')
   // set once a gap is expanded: the full-context diff plus which lines are shown
   const [model, setModel] = useState<Model | null>(null)
@@ -179,8 +180,8 @@ export default function DiffView({ repo, hash, file, side, wipTick }: { repo: st
       )}
       {mode.splitToggle && (
         <div className="view-toggle">
-          <button className={split ? '' : 'active'} aria-pressed={!split} onClick={() => { setSplit(false); localStorage.setItem('megit-diff-split', '0') }}>Unified</button>
-          <button className={split ? 'active' : ''} aria-pressed={split} onClick={() => { setSplit(true); localStorage.setItem('megit-diff-split', '1') }}>Split</button>
+          <button className={split ? '' : 'active'} aria-pressed={!split} onClick={() => setSetting('diffSplit', false)}>Unified</button>
+          <button className={split ? 'active' : ''} aria-pressed={split} onClick={() => setSetting('diffSplit', true)}>Split</button>
         </div>
       )}
     </div>

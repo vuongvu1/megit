@@ -3,6 +3,8 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { useTheme } from './theme'
+import { getSettings, subscribe } from './settingsStore'
+import { DEFAULT_STACK, fontStack } from './settings'
 
 // this module is React.lazy-loaded — xterm.js stays out of the main bundle
 // and only downloads the first time a terminal is opened
@@ -53,7 +55,7 @@ function TermPane({ repo, pane, closable, onExit, onSplit }: {
 
   useEffect(() => {
     const term = new Terminal({
-      fontFamily: "'Ubuntu Mono', ui-monospace, monospace",
+      fontFamily: fontStack(getSettings().fontFamily) || DEFAULT_STACK,
       fontSize: 14,
       theme: xtermTheme(),
     })
@@ -62,6 +64,15 @@ function TermPane({ repo, pane, closable, onExit, onSplit }: {
     term.open(hostRef.current!)
     fit.fit()
     termRef.current = term
+
+    // A CSS variable cannot reach xterm's options, so the panel listens instead.
+    // Refit after the assignment: the cell metrics change with the family.
+    const offFont = subscribe(() => {
+      const next = fontStack(getSettings().fontFamily) || DEFAULT_STACK
+      if (term.options.fontFamily === next) return
+      term.options.fontFamily = next
+      fit.fit()
+    })
 
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(`${proto}://${location.host}/api/term?repo=${encodeURIComponent(repo)}&pane=${pane}`)
@@ -79,6 +90,7 @@ function TermPane({ repo, pane, closable, onExit, onSplit }: {
       if (e.code === 4000) cbs.current.onExit()
       else term.write('\r\n[disconnected — reopen the panel to reconnect]\r\n')
     }
+    // Listed in shortcuts.ts for the Settings dialog — change one, change both.
     term.attachCustomKeyEventHandler(e => {
       if (e.type !== 'keydown' || !e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return true
       // Cmd+K clears like a native macOS terminal; server ring buffer must clear
@@ -110,6 +122,7 @@ function TermPane({ repo, pane, closable, onExit, onSplit }: {
 
     return () => {
       unmounted = true
+      offFont()
       ro.disconnect()
       onData.dispose()
       onResize.dispose()

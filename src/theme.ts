@@ -27,6 +27,7 @@ export const toggleTheme = () => {
   listeners.forEach(l => l())
 }
 
+// Listed in shortcuts.ts for the Settings dialog — change one, change both.
 window.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'Digit0') {
     e.preventDefault()

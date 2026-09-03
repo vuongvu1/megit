@@ -28,6 +28,8 @@
 }
 
 :root {
+  /* Overridden inline on <html> by settingsStore.ts when a font is chosen. */
+  --font-stack: 'Ubuntu Mono', ui-monospace, monospace;
   --bg: #1e2228;
   --bg-panel: #23272e;
   --bg-tabbar: #14171c;
@@ -63,7 +65,7 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body {
-  font: 16px/1.4 'Ubuntu Mono', ui-monospace, monospace;
+  font: 16px/1.4 var(--font-stack);
   background: var(--bg); color: var(--fg);
 }
 button { background: var(--bg-hover); color: inherit; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
@@ -78,7 +80,11 @@ button:hover { background: var(--border); }
 .toast { padding: 8px 10px; border-radius: 6px; background: var(--bg-panel); border: 1px solid #e06c75; border-left-width: 3px; color: var(--fg); white-space: pre-wrap; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); animation: appear .15s ease-out; }
 
 .tabbar { display: flex; gap: 2px; background: var(--bg-tabbar); padding: 6px 6px 0; flex-shrink: 0; }
-.logo { width: 18px; height: 18px; align-self: center; margin: 0 4px 6px 2px; pointer-events: none; }
+/* align-items:flex-end puts the logo's bottom edge and the version's baseline box
+   on one line; the tag's line-height:1 means its box bottom is where the glyphs
+   actually end, so they finish flush. */
+.brand { display: flex; align-items: flex-end; gap: 5px; align-self: center; margin: 0 6px 6px 2px; }
+.logo { width: 18px; height: 18px; display: block; pointer-events: none; }
 .tab { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px 6px 0 0; background: var(--bg-tab); cursor: pointer; }
 .tab.active { background: var(--bg-panel); }
 .tab.dragging { opacity: 0.5; }
@@ -87,13 +93,98 @@ button:hover { background: var(--border); }
 /* --border, not --bg-hover: the latter is nearly identical to the active tab's --bg-panel. */
 .tab-close:hover { background: var(--border); color: var(--fg); }
 .tab-add { border: none; padding: 6px 12px; background: none; font-size: 15px; }
-/* margin-left:auto pushes it to the right edge; bottom margin matches .logo so it sits on the tab baseline. */
-.build-tag { margin: 0 4px 6px auto; align-self: center; font-size: 11px; color: var(--fg-faint); user-select: none; }
+.build-tag { line-height: 1; font-size: 11px; color: var(--fg-faint); user-select: none; }
+/* margin-left:auto takes the right edge the version tag used to hold. */
+.tab-cog { display: inline-flex; align-items: center; margin: 0 4px 6px auto; padding: 3px; border: none; background: none; color: var(--fg-faint); align-self: center; }
+.tab-cog:hover { background: none; color: var(--fg); }
 
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
-.modal { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; width: 480px; max-height: 70vh; display: flex; flex-direction: column; }
+/* Percentages of the fixed, inset-0 backdrop rather than vh: viewport units are
+   computed before :root's zoom is applied and then scaled by it, so 70vh renders
+   as 112% of the screen at zoom 1.6 and pushes the header off the top. The
+   backdrop is already the right size at any zoom, so resolve against it. */
+.modal { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; width: 480px; max-height: 70%; display: flex; flex-direction: column; }
 .modal-head { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); }
 .modal-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-dim); }
+
+/* Settings dialog. Spacing and type follow Radix's scales rather than ad-hoc
+   values: a 4px space step (--s1..--s5) and a 16/14/12 type step (--t3..--t1).
+   Three sizes is the whole scale — the previous five included 13.33px, which was
+   the UA default leaking through because the controls never said `font: inherit`.
+   Tokens are scoped to the dialog so the rest of the app is untouched. */
+.modal.settings {
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px;
+  --t1: 12px; --t2: 14px; --t3: 16px;
+  --ctrl-h: 26px; --ctrl-w: 232px;
+  /* max-width is a percentage of the fixed backdrop, so a narrow window or a
+     high zoom level shrinks the dialog instead of clipping it. */
+  width: 620px; max-width: 92%; display: flex; flex-direction: column;
+}
+.modal.settings .modal-head { padding: var(--s3) var(--s5); }
+.modal.settings .modal-head b { font-size: var(--t3); color: var(--fg); }
+/* Icon-only, so it needs the aria-label a text button must not have. */
+.settings-close { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; background: none; color: var(--fg-dim); border-radius: 4px; }
+.settings-close:hover { background: var(--bg-hover); color: var(--fg); }
+.settings-body { flex: 1; overflow-y: auto; padding: var(--s4) var(--s5) var(--s5); }
+
+/* 24px between sections, 8px from a heading to the rows it owns: the heading
+   binds downward to its group instead of floating between two. */
+.settings-group + .settings-group { margin-top: var(--s5); }
+.settings-h { margin-bottom: var(--s2); font-size: var(--t2); font-weight: 600; color: var(--fg); }
+
+/* One control column, so every control shares a width and the right edges line
+   up by construction rather than by each control sizing itself. */
+.settings-row { display: grid; grid-template-columns: 1fr var(--ctrl-w); align-items: center; gap: var(--s3); min-height: 30px; }
+.settings-row > label { font-size: var(--t2); color: var(--fg); }
+.modal.settings select,
+.modal.settings input:not([type=checkbox]) {
+  width: 100%; height: var(--ctrl-h); padding: 0 var(--s2);
+  font: inherit; font-size: var(--t2);
+  background: var(--bg-panel); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 5px;
+}
+/* appearance:none drops the native control chrome that made these read as
+   foreign; the caret is a static grey that carries in both themes. */
+.modal.settings select {
+  appearance: none; padding-right: var(--s5);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%239aa4b2' stroke-width='1.5'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right var(--s2) center; background-size: 12px;
+}
+.modal.settings input[type=checkbox] { width: 15px; height: 15px; margin: 0; justify-self: end; accent-color: #5a80b0; }
+.modal.settings .theme-switch { justify-self: end; }
+/* Segmented, like the diff toolbar's Unified|Split, and filling the control column
+   exactly so it aligns with the selects. Each button is its own label: the "aA"
+   renders at the size that button applies, so the control demonstrates rather
+   than describes. Percentages stay in the tooltip for anyone who wants them. */
+.zoom-presets { display: grid; grid-template-columns: repeat(4, 1fr); }
+.zoom-presets button { display: inline-flex; align-items: center; justify-content: center; height: var(--ctrl-h); padding: 0; border-radius: 0; color: var(--fg-dim); }
+.zoom-presets button + button { border-left: none; }
+.zoom-presets button:first-child { border-radius: 5px 0 0 5px; }
+.zoom-presets button:last-child { border-radius: 0 5px 5px 0; }
+.zoom-presets button.active { background: var(--bg-selected); color: var(--fg); }
+.zoom-presets [data-z="sm"] { font-size: 10px; }
+.zoom-presets [data-z="md"] { font-size: 12px; }
+.zoom-presets [data-z="lg"] { font-size: 14px; }
+.zoom-presets [data-z="xl"] { font-size: 16px; }
+/* Help text belongs to the row above it: tight to that row, loose before the next. */
+.settings-warn { margin: var(--s1) 0 var(--s3); font-size: var(--t1); line-height: 1.45; color: var(--fg-faint); }
+
+.sc-group + .sc-group { margin-top: var(--s3); }
+.sc-group-name { margin-bottom: var(--s1); font-size: var(--t1); color: var(--fg-faint); }
+.sc-row { display: grid; grid-template-columns: 108px 1fr; gap: var(--s3); align-items: center; min-height: 26px; }
+.sc-keys { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+/* Alternatives ('↑ ↓') sit side by side; a combination's keys are joined by the
+   plus below. Each key gets its own chip: one glyph per box centres reliably,
+   where a chip reading "⌘F" is thrown off by the two glyphs' different metrics. */
+.sc-alt { display: inline-flex; align-items: center; gap: 3px; }
+.sc-alt > span { display: inline-flex; align-items: center; gap: 3px; }
+.sc-row kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-hover); font: inherit; font-size: var(--t1); line-height: 1; color: var(--fg-dim); }
+.sc-plus { flex: none; color: var(--fg-faint); }
+.sc-label { font-size: var(--t2); color: var(--fg-dim); }
+
+/* In the content flow, not a pinned bar: it is a credit, not a toolbar. */
+.settings-foot { margin-top: var(--s5); padding-top: var(--s3); border-top: 1px solid var(--border); font-size: var(--t1); color: var(--fg-faint); text-align: center; }
+.settings-foot a { color: var(--fg-dim); }
 .dirlist { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
 .dirlist li { display: flex; align-items: center; padding: 4px 8px; border-radius: 4px; }
 .dirlist li:hover { background: var(--bg-hover); }
@@ -103,7 +194,7 @@ button:hover { background: var(--border); }
 /* The repo picker is two panes side by side, so it needs the extra width. Fixed
    height: panes scroll independently and the dialog never resizes as you navigate.
    overflow:hidden keeps the recent pane's background inside the rounded corners. */
-.picker { flex-direction: row; width: 720px; height: 440px; max-height: 80vh; overflow: hidden; }
+.picker { flex-direction: row; width: 720px; height: 440px; max-height: 80%; overflow: hidden; }
 .picker-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .picker-recent { flex: none; width: 240px; border-right: 1px solid var(--border); background: var(--bg-tab); }
 .picker-recent .dirlist li.sel { background: var(--bg-selected); }
@@ -238,7 +329,7 @@ button:hover { background: var(--border); }
 .ref-icon { flex-shrink: 0; opacity: 0.8; }
 .subject { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .date { color: var(--fg-dim); font-size: 12px; }
-.hash { color: var(--fg-faint); font-family: 'Ubuntu Mono', ui-monospace, monospace; font-size: 12px; }
+.hash { color: var(--fg-faint); font-family: var(--font-stack); font-size: 12px; }
 .load-more { margin: 8px; padding: 4px 14px; }
 
 /* context menu: popover default styling is a centered inset:0 box — reset to cursor-anchored */
@@ -304,7 +395,7 @@ button:hover { background: var(--border); }
 .person-when { color: var(--fg-dim); font-size: 12px; }
 .face { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
 .face-fallback { display: inline-flex; align-items: center; justify-content: center; background: var(--bg-hover); color: var(--fg-dim); font-size: 11px; }
-.commit-hash { position: absolute; top: 10px; right: 12px; color: var(--fg-faint); font-family: 'Ubuntu Mono', ui-monospace, monospace; font-size: 12px; }
+.commit-hash { position: absolute; top: 10px; right: 12px; color: var(--fg-faint); font-family: var(--font-stack); font-size: 12px; }
 
 .files-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .files-counts { display: flex; gap: 10px; color: var(--fg-dim); font-size: 12px; white-space: nowrap; overflow: hidden; }
@@ -319,7 +410,7 @@ button:hover { background: var(--border); }
 .file-row { display: flex; gap: 8px; padding: 3px 8px; cursor: pointer; border-radius: 4px; }
 .file-row:hover { background: var(--bg-hover); }
 .file-row.selected { background: var(--bg-selected); }
-.file-status { font-family: 'Ubuntu Mono', ui-monospace, monospace; width: 14px; flex-shrink: 0; }
+.file-status { font-family: var(--font-stack); width: 14px; flex-shrink: 0; }
 .file-path { display: flex; min-width: 0; overflow: hidden; white-space: nowrap; }
 .file-name { flex: 0 0 auto; }
 
@@ -339,7 +430,7 @@ button:hover { background: var(--border); }
    long lines horizontally under them via .d2h-file-diff */
 .diff-html .d2h-file-wrapper { position: relative; }
 .diff-html .d2h-file-diff { overflow-x: auto; }
-.diff-html .d2h-diff-table { font-family: 'Ubuntu Mono', ui-monospace, monospace; }
+.diff-html .d2h-diff-table { font-family: var(--font-stack); }
 /* d2h ships cursor:pointer on line numbers; nothing is clickable there */
 .diff-html .d2h-code-linenumber, .diff-html .d2h-code-side-linenumber { cursor: default; }
 /* gap expanders live in the hunk-header gutter, which d2h positions absolutely,

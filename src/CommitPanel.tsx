@@ -352,6 +352,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
                   autoFocus
                   disabled={saving}
                   onChange={e => setDraft(e.target.value)}
+                  // Listed in shortcuts.ts for the Settings dialog — change one, change both.
                   onKeyDown={e => {
                     if (e.key === 'Escape') setDraft(null)
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
@@ -382,6 +383,7 @@ export default function CommitPanel({ repo, selection, status, file, fileSide, o
             value={msg}
             disabled={busy}
             onChange={e => setMsg(e.target.value)}
+            // Listed in shortcuts.ts for the Settings dialog — change one, change both.
             onKeyDown={e => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCommit) commit()
             }}

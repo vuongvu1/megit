@@ -9,6 +9,17 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Added
+
+- A **Settings** dialog in a cog button at the end of the tab bar: font, app zoom, theme,
+  default diff view, an author avatars toggle (stops GitHub/Gravatar lookups when off),
+  and a shortcut reference.
+
+### Changed
+
+- The version tag moved from the right end of the tab bar to beside the logo, making room
+  for the new settings cog.
+
 ## [0.9.0] - 2026-08-28
 
 ### Changed

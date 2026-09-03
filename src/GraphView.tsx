@@ -484,6 +484,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
   // leaves the arrows to that pane's own scrolling. Nothing focused is the graph.
   const listRef = useRef<HTMLDivElement>(null)
   const order = useMemo(() => rowOrder(commits, placements.byRow, showWip), [commits, placements, showWip])
+  // Listed in shortcuts.ts for the Settings dialog — change one, change both.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return // ⌘↓ is "scroll to bottom"
