@@ -1,6 +1,6 @@
 {
   "name": "megit-app",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Git repository viewer in the browser: commit graph with branch lanes, diffs, stashes and WIP",
   "license": "MIT",
   "author": "Hoang Vuong Vu",
@@ -48,7 +48,7 @@
   "devDependencies": {
     "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
+    "@types/react-dom": "^19.2.7",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.1.1",
     "@xterm/addon-fit": "^0.11.0",
@@ -60,6 +60,6 @@
     "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   }
 }

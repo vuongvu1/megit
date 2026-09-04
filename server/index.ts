@@ -1,6 +1,6 @@
 import { createApp, serveStatic, type Handler } from './http.ts'
 import { execFile } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { readFile, realpath, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
@@ -928,6 +928,66 @@ app.get('/api/blob', repoGuard, async (req, res) => {
     // but a direct navigation to this URL would — sandbox it either way
     res.set('Content-Security-Policy', "sandbox; default-src 'none'").set('X-Content-Type-Options', 'nosniff')
     res.type(mime).send(buf)
+  } catch {
+    res.status(404).end()
+  }
+})
+
+// The repo's own favicon, used as its icon in the picker. Checked against the
+// framework conventions people actually ship; no hit is a 404 and the client
+// falls back to a letter chip. Not repoGuard'd: a recent repo need not be open,
+// but it must still be one the user has added at some point.
+// Most projects don't ship a file literally called favicon.*: they declare one
+// in their entry html (megit's own is /logo.svg). Reading that link first is
+// what makes the icon right rather than merely present.
+function declaredIcon(repo: string): string[] {
+  for (const html of ['index.html', 'public/index.html', 'app/index.html', 'src/index.html']) {
+    const file = join(repo, html)
+    if (!existsSync(file)) continue
+    const href = /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/i.exec(readFileSync(file, 'utf8'))?.[0]
+      ?.match(/href=["']([^"']+)["']/i)?.[1]
+    // data: and http: hrefs have nothing on disk to serve
+    if (!href || /^[a-z]+:/i.test(href)) continue
+    const rel = href.split(/[?#]/)[0]!.replace(/^\/+/, '')
+    return [rel, join('public', rel), join('static', rel), join(dirname(html), rel)]
+  }
+  return []
+}
+
+const FAVICONS = [
+  'public/favicon.svg', 'public/favicon.ico', 'public/favicon.png', 'public/favicon-32x32.png',
+  'app/favicon.ico', 'src/favicon.svg', 'static/favicon.svg', 'static/favicon.ico', 'static/favicon.png',
+  'assets/favicon.ico', 'favicon.svg', 'favicon.ico', 'favicon.png',
+]
+
+app.get('/api/favicon', async (req, res) => {
+  const repo = String(req.query.repo ?? '')
+  const cfg = loadConfig()
+  if (!cfg.repos.includes(repo) && !cfg.recent.includes(repo)) {
+    res.status(400).json({ error: 'unknown repo' })
+    return
+  }
+  const hit = [...declaredIcon(repo), ...FAVICONS].map(f => join(repo, f)).find(f => existsSync(f) && MIME[f.split('.').pop()!.toLowerCase()])
+  if (!hit) {
+    res.status(404).end()
+    return
+  }
+  try {
+    // same symlink escape as /api/blob: a clone can carry public/favicon.ico ->
+    // /etc/passwd, and serving it would leak the bytes under an image type
+    const abs = await realpath(hit)
+    const root = await realpath(repo)
+    if (!abs.startsWith(root + sep)) {
+      res.status(400).json({ error: 'path outside repo' })
+      return
+    }
+    // repo content is untrusted (an SVG can carry script)
+    res.set('Content-Security-Policy', "sandbox; default-src 'none'").set('X-Content-Type-Options', 'nosniff')
+    // A project's icon changes about never, and every picker open would otherwise
+    // re-walk the filesystem for each recent repo. Short enough that swapping a
+    // favicon shows up without a restart.
+    res.set('Cache-Control', 'private, max-age=300')
+    res.type(MIME[hit.split('.').pop()!.toLowerCase()]!).send(await readFile(abs))
   } catch {
     res.status(404).end()
   }

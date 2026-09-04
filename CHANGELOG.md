@@ -9,6 +9,14 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-04
+
+### Added
+
+- Recent projects in the repo picker now show the repo's own favicon — read from
+  the icon its entry html declares, or the usual `favicon.*` locations — falling
+  back to a colored initial chip when the repo ships none.
+
 ## [0.10.0] - 2026-09-03
 
 ### Added
@@ -249,7 +257,8 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — node-pty is an optionalDependency with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/vuongvu1/megit/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/vuongvu1/megit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/vuongvu1/megit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/vuongvu1/megit/compare/v0.7.0...v0.8.0

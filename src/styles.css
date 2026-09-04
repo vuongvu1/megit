@@ -199,6 +199,11 @@ button:hover { background: var(--border); }
 .picker-recent { flex: none; width: 240px; border-right: 1px solid var(--border); background: var(--bg-tab); }
 .picker-recent .dirlist li.sel { background: var(--bg-selected); }
 .recent-filter { margin: 2px 12px 4px; padding: 3px 6px; background: var(--bg-panel); color: var(--fg); border: 1px solid var(--border); border-radius: 5px; font: inherit; min-width: 0; }
+.repo-logo { position: relative; width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 10px; font-weight: 600; color: #fff; overflow: hidden; }
+.repo-logo img { position: absolute; inset: 1px; width: calc(100% - 2px); height: calc(100% - 2px); object-fit: contain; }
+/* Favicons are drawn for the browser's own chrome, so a dark-on-transparent mark
+   disappears against the panel. A light plate makes every icon legible in both themes. */
+.repo-logo.has-icon { background: #fff; }
 .recent-dot { width: 6px; height: 6px; border-radius: 50%; background: #2ea043; flex-shrink: 0; }
 .dir-chevron { color: var(--fg-faint); cursor: pointer; padding-left: 8px; }
 

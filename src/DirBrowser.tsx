@@ -6,6 +6,44 @@ type FsDir = { path: string; parent: string | null; dirs: { name: string; path: 
 
 const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 
+// Deterministic hue from the full path, so a repo keeps the same colour across
+// sessions and two checkouts of the same project stay distinguishable.
+const hue = (p: string) => {
+  let h = 0
+  for (let i = 0; i < p.length; i++) h = (h * 31 + p.charCodeAt(i)) % 360
+  return h
+}
+
+// A browser won't reuse a cached 404 for an <img>, so a repo with no icon would
+// re-request on every picker open. Module scope: the picker unmounts on close.
+const noIcon = new Set<string>()
+
+// The repo's own favicon when it ships one, its initial on a stable colour when
+// it doesn't. The <img> paints over the chip rather than replacing it, so the
+// list never reflows while icons load.
+function RepoIcon({ path }: { path: string }) {
+  const [state, setState] = useState<'load' | 'ok' | 'fail'>(() => (noIcon.has(path) ? 'fail' : 'load'))
+  return (
+    <span
+      className={`repo-logo${state === 'ok' ? ' has-icon' : ''}`}
+      style={state === 'ok' ? undefined : { background: `hsl(${hue(path)} 42% 42%)` }}
+    >
+      {state !== 'fail' && (
+        <img
+          src={`/api/favicon?repo=${encodeURIComponent(path)}`}
+          alt=""
+          onLoad={() => setState('ok')}
+          onError={() => {
+            noIcon.add(path)
+            setState('fail')
+          }}
+        />
+      )}
+      {state !== 'ok' && base(path).charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
 export default function DirBrowser({ recent, open, active, onPicked, onSelect, onClose }: {
   recent: string[]
   open: string[]
@@ -65,6 +103,7 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
             <ul className="dirlist">
               {shown.map(r => (
                 <li key={r} className={r === active ? 'sel' : ''}>
+                  <RepoIcon path={r} />
                   <span className="dirname" title={r} onClick={() => openRecent(r)}>{base(r)}</span>
                   {open.includes(r) && <span className="recent-dot" title="open" />}
                 </li>
