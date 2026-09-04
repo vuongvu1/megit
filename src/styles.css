@@ -199,6 +199,7 @@ button:hover { background: var(--border); }
 .picker-recent { flex: none; width: 240px; border-right: 1px solid var(--border); background: var(--bg-tab); }
 .picker-recent .dirlist li.sel { background: var(--bg-selected); }
 .recent-filter { margin: 2px 12px 4px; padding: 3px 6px; background: var(--bg-panel); color: var(--fg); border: 1px solid var(--border); border-radius: 5px; font: inherit; min-width: 0; }
+.repo-logo { width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 10px; font-weight: 600; color: #fff; }
 .recent-dot { width: 6px; height: 6px; border-radius: 50%; background: #2ea043; flex-shrink: 0; }
 .dir-chevron { color: var(--fg-faint); cursor: pointer; padding-left: 8px; }
 

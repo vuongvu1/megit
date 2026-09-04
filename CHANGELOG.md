@@ -9,6 +9,11 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+### Added
+
+- Recent projects in the repo picker now show a colored initial chip, so repeated
+  basenames are easier to tell apart at a glance.
+
 ## [0.10.0] - 2026-09-03
 
 ### Added

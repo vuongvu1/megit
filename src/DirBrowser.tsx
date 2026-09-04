@@ -6,6 +6,14 @@ type FsDir = { path: string; parent: string | null; dirs: { name: string; path: 
 
 const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 
+// Deterministic hue from the full path, so a repo keeps the same colour across
+// sessions and two checkouts of the same project stay distinguishable.
+const hue = (p: string) => {
+  let h = 0
+  for (let i = 0; i < p.length; i++) h = (h * 31 + p.charCodeAt(i)) % 360
+  return h
+}
+
 export default function DirBrowser({ recent, open, active, onPicked, onSelect, onClose }: {
   recent: string[]
   open: string[]
@@ -65,6 +73,9 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
             <ul className="dirlist">
               {shown.map(r => (
                 <li key={r} className={r === active ? 'sel' : ''}>
+                  <span className="repo-logo" style={{ background: `hsl(${hue(r)} 42% 42%)` }} aria-hidden>
+                    {base(r).charAt(0).toUpperCase()}
+                  </span>
                   <span className="dirname" title={r} onClick={() => openRecent(r)}>{base(r)}</span>
                   {open.includes(r) && <span className="recent-dot" title="open" />}
                 </li>
