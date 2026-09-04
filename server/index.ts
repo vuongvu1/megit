@@ -983,6 +983,10 @@ app.get('/api/favicon', async (req, res) => {
     }
     // repo content is untrusted (an SVG can carry script)
     res.set('Content-Security-Policy', "sandbox; default-src 'none'").set('X-Content-Type-Options', 'nosniff')
+    // A project's icon changes about never, and every picker open would otherwise
+    // re-walk the filesystem for each recent repo. Short enough that swapping a
+    // favicon shows up without a restart.
+    res.set('Cache-Control', 'private, max-age=300')
     res.type(MIME[hit.split('.').pop()!.toLowerCase()]!).send(await readFile(abs))
   } catch {
     res.status(404).end()

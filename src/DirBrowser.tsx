@@ -14,11 +14,15 @@ const hue = (p: string) => {
   return h
 }
 
+// A browser won't reuse a cached 404 for an <img>, so a repo with no icon would
+// re-request on every picker open. Module scope: the picker unmounts on close.
+const noIcon = new Set<string>()
+
 // The repo's own favicon when it ships one, its initial on a stable colour when
 // it doesn't. The <img> paints over the chip rather than replacing it, so the
 // list never reflows while icons load.
 function RepoIcon({ path }: { path: string }) {
-  const [state, setState] = useState<'load' | 'ok' | 'fail'>('load')
+  const [state, setState] = useState<'load' | 'ok' | 'fail'>(() => (noIcon.has(path) ? 'fail' : 'load'))
   return (
     <span
       className={`repo-logo${state === 'ok' ? ' has-icon' : ''}`}
@@ -29,7 +33,10 @@ function RepoIcon({ path }: { path: string }) {
           src={`/api/favicon?repo=${encodeURIComponent(path)}`}
           alt=""
           onLoad={() => setState('ok')}
-          onError={() => setState('fail')}
+          onError={() => {
+            noIcon.add(path)
+            setState('fail')
+          }}
         />
       )}
       {state !== 'ok' && base(path).charAt(0).toUpperCase()}
