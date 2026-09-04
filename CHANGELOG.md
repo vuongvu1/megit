@@ -11,8 +11,9 @@ surface, and the HTTP API may change in any minor release.
 
 ### Added
 
-- Recent projects in the repo picker now show a colored initial chip, so repeated
-  basenames are easier to tell apart at a glance.
+- Recent projects in the repo picker now show the repo's own favicon — read from
+  the icon its entry html declares, or the usual `favicon.*` locations — falling
+  back to a colored initial chip when the repo ships none.
 
 ## [0.10.0] - 2026-09-03
 

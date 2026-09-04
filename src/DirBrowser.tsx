@@ -14,6 +14,29 @@ const hue = (p: string) => {
   return h
 }
 
+// The repo's own favicon when it ships one, its initial on a stable colour when
+// it doesn't. The <img> paints over the chip rather than replacing it, so the
+// list never reflows while icons load.
+function RepoIcon({ path }: { path: string }) {
+  const [state, setState] = useState<'load' | 'ok' | 'fail'>('load')
+  return (
+    <span
+      className={`repo-logo${state === 'ok' ? ' has-icon' : ''}`}
+      style={state === 'ok' ? undefined : { background: `hsl(${hue(path)} 42% 42%)` }}
+    >
+      {state !== 'fail' && (
+        <img
+          src={`/api/favicon?repo=${encodeURIComponent(path)}`}
+          alt=""
+          onLoad={() => setState('ok')}
+          onError={() => setState('fail')}
+        />
+      )}
+      {state !== 'ok' && base(path).charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
 export default function DirBrowser({ recent, open, active, onPicked, onSelect, onClose }: {
   recent: string[]
   open: string[]
@@ -73,9 +96,7 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
             <ul className="dirlist">
               {shown.map(r => (
                 <li key={r} className={r === active ? 'sel' : ''}>
-                  <span className="repo-logo" style={{ background: `hsl(${hue(r)} 42% 42%)` }} aria-hidden>
-                    {base(r).charAt(0).toUpperCase()}
-                  </span>
+                  <RepoIcon path={r} />
                   <span className="dirname" title={r} onClick={() => openRecent(r)}>{base(r)}</span>
                   {open.includes(r) && <span className="recent-dot" title="open" />}
                 </li>
