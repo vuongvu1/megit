@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import ThemeSwitch from './ThemeSwitch'
 import { useSettings, setSetting } from './settingsStore'
-import { ZOOM_PRESETS, nearestPreset } from './settings'
+import { PAGE_SIZES, ZOOM_PRESETS, nearestPreset } from './settings'
 import { GROUPS, SHORTCUTS, renderKeys } from './shortcuts'
 
 // navigator.platform is deprecated but still the only synchronous way to tell;
@@ -87,6 +87,16 @@ export default function Settings({ onClose }: { onClose: () => void }) {
               outbound requests.
             </div>
             <div className="settings-row">
+              <label htmlFor="set-page">Commits per load</label>
+              <select id="set-page" value={s.pageSize} onChange={e => setSetting('pageSize', Number(e.target.value))}>
+                {PAGE_SIZES.map(n => <option key={n} value={n}>{n}{n === 200 ? ' (default)' : ''}</option>)}
+              </select>
+            </div>
+            <div className="settings-warn">
+              Rows fetched per request, and per “load more”. Larger pages mean fewer round-trips
+              while scrolling, and a slower first paint on a big repository.
+            </div>
+            <div className="settings-row">
               <label htmlFor="set-diff">Diff view</label>
               <select id="set-diff" value={s.diffSplit ? 'split' : 'unified'} onChange={e => setSetting('diffSplit', e.target.value === 'split')}>
                 <option value="unified">Unified</option>
@@ -95,7 +105,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="settings-group">
-            <div className="settings-h">Shortcuts</div>
+            <div className="settings-h">Keyboard &amp; mouse</div>
             {GROUPS.map(g => (
               <div key={g} className="sc-group">
                 <div className="sc-group-name">{g}</div>

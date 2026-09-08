@@ -7,7 +7,7 @@ import Toasts from './Toast'
 import Settings from './SettingsDialog'
 
 // hasTerminal is server-reported: node-pty is optional and has no Linux prebuild
-export type Config = { repos: string[]; activeRepo: string | null; recent: string[]; hasTerminal: boolean }
+export type Config = { repos: string[]; activeRepo: string | null; recent: string[]; hasTerminal: boolean; home: string }
 
 // Fetch failures already surface inside RepoView; a *render* throw is the one that
 // unmounts the tree and leaves a blank window with only the console to explain it.
@@ -56,11 +56,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <TabBar repos={cfg.repos} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} onReorder={reorder} onReorderEnd={reorderEnd} onSettings={() => setSettingsOpen(true)} />
+      <TabBar repos={cfg.repos} home={cfg.home} active={cfg.activeRepo} onSelect={select} onAdd={() => setBrowsing(true)} onClose={close} onReorder={reorder} onReorderEnd={reorderEnd} onSettings={() => setSettingsOpen(true)} />
       {browsing && (
         <DirBrowser
           recent={cfg.recent}
           open={cfg.repos}
+          home={cfg.home}
           active={cfg.activeRepo}
           onPicked={c => { setCfg(c); setBrowsing(false) }}
           onSelect={select}
@@ -71,7 +72,7 @@ export default function App() {
       {cfg.activeRepo
         ? (
           <Boundary key={cfg.activeRepo}>
-            <RepoView repo={cfg.activeRepo} onRemove={() => close(cfg.activeRepo!)} hasTerminal={cfg.hasTerminal} />
+            <RepoView repo={cfg.activeRepo} home={cfg.home} onRemove={() => close(cfg.activeRepo!)} hasTerminal={cfg.hasTerminal} />
           </Boundary>
         )
         : <div className="empty">No repository open — add one with “+”</div>}
