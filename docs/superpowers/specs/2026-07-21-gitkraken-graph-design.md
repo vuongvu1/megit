@@ -19,7 +19,7 @@ Make the commit graph read like GitKraken:
 
 Order: GitHub profile photo → Gravatar → initials.
 
-- `server/avatars.ts`: `GET /api/avatar?repo&email` resolves email → GitHub avatar. Noreply emails (`12345+user@users.noreply.github.com`) resolve locally to `avatars.githubusercontent.com/u/<id>`; other emails find one commit by that author (`git log --all -1 --author=<escaped email>`) and ask `api.github.com/repos/<owner>/<repo>/commits/<sha>` for `author.avatar_url`. Uses `gh auth token` when available (5000 req/h vs 60). Definitive results (incl. "no account") persist to `~/.config/megit/avatars.json`; rate-limit/network errors stay uncached for retry.
+- `server/avatars.ts`: `GET /api/avatar?repo&email` resolves email → GitHub avatar. Noreply emails (`12345+user@users.noreply.github.com`) resolve locally to `avatars.githubusercontent.com/u/<id>`; other emails find one commit by that author (`git log --all -1 --author=<escaped email>`) and ask `api.github.com/repos/<owner>/<repo>/commits/<sha>` for `author.avatar_url`. (Originally used `gh auth token` when available, for 5000 req/h instead of 60; dropped in 0.11.1 — the cache makes one request per author, so the anonymous limit never binds, and reading a credential ahead of an outbound request is a shape not worth having. See SECURITY.md.) Definitive results (incl. "no account") persist to `~/.config/megit/avatars.json`; rate-limit/network errors stay uncached for retry.
 
 ### Client
 

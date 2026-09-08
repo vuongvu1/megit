@@ -1,7 +1,19 @@
-import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+
+// This file holds every outbound network call the server makes, and every
+// external host it knows about:
+//
+//   api.github.com                — commit -> GitHub account lookup (resolveAvatar)
+//   avatars.githubusercontent.com — the photo itself, fetched by the browser
+//   github.com/<user>.png         — same, for legacy noreply emails
+//
+// All three are literals, never assembled from remote input, and nothing here
+// runs unless author avatars are on in Settings. Requests are anonymous: no
+// token is read, sent or stored, so GitHub's 60 req/h unauthenticated limit
+// applies — the on-disk cache below makes that one request per author, ever.
+// See SECURITY.md, "Threat model".
 
 // GitHub noreply emails encode the account: "12345+user@users.noreply.github.com"
 // (current form) or legacy "user@users.noreply.github.com".
@@ -13,7 +25,8 @@ export function noreplyAvatar(email: string): string | null {
     : `https://github.com/${m[2]}.png?size=48`
 }
 
-// git@github.com:owner/repo.git | https://github.com/owner/repo(.git)
+// owner/repo out of either remote spelling — ssh (git@host:owner/repo.git) or
+// https (host/owner/repo, with or without the .git suffix)
 export function parseGithubRemote(url: string): { owner: string; repo: string } | null {
   const m = url.trim().match(/github\.com[:/]([^/]+)\/([^/\s]+?)(?:\.git)?$/)
   return m ? { owner: m[1], repo: m[2] } : null
@@ -36,11 +49,6 @@ function saveCache() {
   writeFileSync(cacheFile, JSON.stringify(cache, null, 2))
 }
 
-// gh CLI token when the user is logged in — lifts the API limit from 60/h to 5000/h
-let tokenP: Promise<string | null> | null = null
-const ghToken = () =>
-  (tokenP ??= new Promise(r => execFile('gh', ['auth', 'token'], (e, out) => r(e ? null : out.trim() || null))))
-
 type Git = (repo: string, args: string[]) => Promise<string>
 
 // email -> GitHub profile avatar. Strategy: noreply emails resolve locally; anything
@@ -61,15 +69,15 @@ export async function resolveAvatar(repo: string, email: string, git: Git): Prom
       const rx = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const sha = (await git(repo, ['log', '--all', '-1', `--author=${rx}`, '--format=%H'])).trim()
       if (sha) {
-        const headers: Record<string, string> = { 'User-Agent': 'megit', Accept: 'application/vnd.github+json' }
-        const token = await ghToken()
-        if (token) headers.Authorization = `Bearer ${token}`
-        const resp = await fetch(`https://api.github.com/repos/${remote.owner}/${remote.repo}/commits/${sha}`, { headers })
+        const resp = await fetch(`https://api.github.com/repos/${remote.owner}/${remote.repo}/commits/${sha}`, {
+          headers: { 'User-Agent': 'megit', Accept: 'application/vnd.github+json' },
+        })
         if (resp.ok) {
           const data = (await resp.json()) as { author?: { avatar_url?: string } | null }
           const raw = data.author?.avatar_url
           url = raw ? raw + (raw.includes('?') ? '&' : '?') + 's=48' : null
         } else if (resp.status !== 404 && resp.status !== 422) {
+          // 403/429 = rate limited: leave it uncached so a later run retries
           definitive = false
         }
       }
