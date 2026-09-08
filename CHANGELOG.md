@@ -9,6 +9,19 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-09-08
+
+### Changed
+
+- Author avatar lookups no longer read a `gh` CLI token. They were anonymous
+  already whenever `gh` was absent, and the on-disk cache means one request per
+  author, so the 60 req/h unauthenticated limit is not a constraint — while
+  reading a credential before an outbound request is a pattern worth not having.
+- `SECURITY.md` now ships in the published package, so its threat model and
+  dependency-alert triage travel with the tarball an auditor actually reads.
+- Every external host megit contacts is named in a header comment in the two
+  files that contact them (`server/avatars.ts`, `src/avatar.ts`).
+
 ## [0.11.0] - 2026-09-04
 
 ### Added
