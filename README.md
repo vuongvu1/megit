@@ -108,8 +108,10 @@ Auto-refresh only ever reads local git, so commits pushed by someone else stay i
 
 The cog at the right end of the tab bar opens font (bundled Ubuntu Mono, your system
 monospace, or your system UI face), text size in four steps from 80% to 140%, the theme, the default diff
-view, and a toggle for author avatars — off stops the GitHub and Gravatar lookups megit
-otherwise makes per commit author. The same dialog lists every keyboard shortcut below.
+view, how many commits each graph request loads (100–1000, default 150), and a toggle for
+author avatars — off stops the GitHub and Gravatar lookups megit otherwise makes per commit
+author. The same dialog lists every keyboard shortcut below, and the two mouse gestures:
+double-click a branch chip to check it out, right-click a row for its actions.
 
 ### Keyboard
 
