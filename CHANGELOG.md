@@ -9,6 +9,25 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-12
+
+### Added
+
+- **Commits per load** in Settings: 100 to 1000 rows per graph request. The note beside it
+  spells out that search matches only the commits already loaded — "Search all history"
+  reaches past them.
+- The settings dialog's reference table now lists the mouse gestures too: double-click a
+  branch chip to check it out, right-click a commit, chip, stash or WIP row for its actions.
+
+### Changed
+
+- Repository paths print `~/` for your home directory in the header bar, the tab tooltips
+  and the repo picker. The full path stays in the tooltip.
+- The graph loads 150 commits per request instead of 200, for a quicker first paint; the
+  size is a setting now, so it can go back up.
+- Diff view in Settings is a segmented Unified | Split control, matching the one in the
+  diff toolbar.
+
 ## [0.11.1] - 2026-09-08
 
 ### Changed
@@ -270,7 +289,9 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — node-pty is an optionalDependency with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/vuongvu1/megit/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/vuongvu1/megit/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/vuongvu1/megit/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/vuongvu1/megit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/vuongvu1/megit/compare/v0.8.0...v0.9.0

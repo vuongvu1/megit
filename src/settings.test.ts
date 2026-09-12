@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULTS, ZOOM_PRESETS, clampZoom, nearestPreset, parse, fontStack } from './settings'
+import { DEFAULTS, PAGE_SIZES, ZOOM_PRESETS, clampZoom, nearestPreset, parse, fontStack } from './settings'
 
 describe('clampZoom', () => {
   it('holds the range and snaps to 0.1 steps', () => {
@@ -30,6 +30,15 @@ describe('parse', () => {
 
   it('clamps a stored zoom that is out of range', () => {
     expect(parse('{"zoom":42}', DEFAULTS).zoom).toBe(1.6)
+  })
+
+  it('keeps a stored page size that is on the list', () => {
+    expect(parse('{"pageSize":500}', DEFAULTS).pageSize).toBe(500)
+  })
+
+  it('falls back for a page size that is not one of the options', () => {
+    expect(parse('{"pageSize":7}', DEFAULTS).pageSize).toBe(DEFAULTS.pageSize)
+    expect(parse('{"pageSize":"200"}', DEFAULTS).pageSize).toBe(DEFAULTS.pageSize)
   })
 
   it('honours a caller-supplied default, for the diff-split migration', () => {
@@ -76,5 +85,12 @@ describe('nearestPreset', () => {
     expect(nearestPreset(1.15).id).toBe('lg')
     expect(nearestPreset(1.6).id).toBe('xl')   // above the top preset, from an older build
     expect(nearestPreset(0.5).id).toBe('sm')
+  })
+})
+
+describe('PAGE_SIZES', () => {
+  it('offers the default, and nothing the server would cap', () => {
+    expect(PAGE_SIZES).toContain(DEFAULTS.pageSize)
+    expect(Math.max(...PAGE_SIZES)).toBeLessThanOrEqual(5000)
   })
 })

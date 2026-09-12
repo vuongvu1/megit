@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, jsonInit } from './api'
 import type { Config } from './App'
+import { base, tilde } from './paths'
 
 type FsDir = { path: string; parent: string | null; dirs: { name: string; path: string; isRepo: boolean }[]; isRepo: boolean }
-
-const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 
 // Deterministic hue from the full path, so a repo keeps the same colour across
 // sessions and two checkouts of the same project stay distinguishable.
@@ -44,9 +43,10 @@ function RepoIcon({ path }: { path: string }) {
   )
 }
 
-export default function DirBrowser({ recent, open, active, onPicked, onSelect, onClose }: {
+export default function DirBrowser({ recent, open, home, active, onPicked, onSelect, onClose }: {
   recent: string[]
   open: string[]
+  home: string
   active: string | null
   onPicked: (c: Config) => void
   onSelect: (r: string) => void
@@ -87,6 +87,10 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
   }
 
   if (!dir) return null
+  const shownPath = tilde(dir.path, home)
+  // At home itself the shortened path is the whole label: base() would print the
+  // account name back and lose the ~.
+  const crumbName = shownPath === '~' ? '~' : base(dir.path)
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal picker" onClick={e => e.stopPropagation()}>
@@ -104,7 +108,7 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
               {shown.map(r => (
                 <li key={r} className={r === active ? 'sel' : ''}>
                   <RepoIcon path={r} />
-                  <span className="dirname" title={r} onClick={() => openRecent(r)}>{base(r)}</span>
+                  <span className="dirname" title={tilde(r, home)} onClick={() => openRecent(r)}>{base(r)}</span>
                   {open.includes(r) && <span className="recent-dot" title="open" />}
                 </li>
               ))}
@@ -114,9 +118,9 @@ export default function DirBrowser({ recent, open, active, onPicked, onSelect, o
         <div className="picker-pane">
           <div className="modal-head">
             <button disabled={!dir.parent} onClick={() => dir.parent && load(dir.parent)}>↑</button>
-            <span className="modal-path" title={dir.path}>
-              {dir.path.slice(0, dir.path.length - base(dir.path).length)}
-              <b>{base(dir.path)}</b>
+            <span className="modal-path" title={shownPath}>
+              {shownPath.slice(0, shownPath.length - crumbName.length)}
+              <b>{crumbName}</b>
             </span>
             {dir.isRepo && <button onClick={() => pick(dir.path)}>Add</button>}
             <button onClick={onClose}>×</button>

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import ThemeSwitch from './ThemeSwitch'
 import { useSettings, setSetting } from './settingsStore'
-import { ZOOM_PRESETS, nearestPreset } from './settings'
+import { DEFAULTS, PAGE_SIZES, ZOOM_PRESETS, nearestPreset } from './settings'
 import { GROUPS, SHORTCUTS, renderKeys } from './shortcuts'
 
 // navigator.platform is deprecated but still the only synchronous way to tell;
@@ -51,7 +51,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
             </div>
             <div className="settings-row">
               <label>Text size</label>
-              <div className="zoom-presets">
+              <div className="settings-seg zoom-presets">
                 {ZOOM_PRESETS.map(p => (
                   <button
                     key={p.id}
@@ -87,15 +87,29 @@ export default function Settings({ onClose }: { onClose: () => void }) {
               outbound requests.
             </div>
             <div className="settings-row">
-              <label htmlFor="set-diff">Diff view</label>
-              <select id="set-diff" value={s.diffSplit ? 'split' : 'unified'} onChange={e => setSetting('diffSplit', e.target.value === 'split')}>
-                <option value="unified">Unified</option>
-                <option value="split">Split</option>
+              <label htmlFor="set-page">Commits per load</label>
+              <select id="set-page" value={s.pageSize} onChange={e => setSetting('pageSize', Number(e.target.value))}>
+                {PAGE_SIZES.map(n => <option key={n} value={n}>{n}{n === DEFAULTS.pageSize ? ' (default)' : ''}</option>)}
               </select>
+            </div>
+            <div className="settings-warn">
+              Rows fetched per request, and per “load more”. Larger pages mean fewer round-trips
+              while scrolling, and a slower first paint on a big repository. Search matches only the
+              commits already loaded — “Search all history” in the search bar reaches past them.
+            </div>
+            <div className="settings-row">
+              {/* The label is no longer a control's label, so it needs an id the
+                  group points back to — a bare <label> beside a button pair
+                  announces nothing. */}
+              <label id="set-diff-l">Diff view</label>
+              <div className="settings-seg" role="group" aria-labelledby="set-diff-l">
+                <button className={s.diffSplit ? '' : 'active'} aria-pressed={!s.diffSplit} onClick={() => setSetting('diffSplit', false)}>Unified</button>
+                <button className={s.diffSplit ? 'active' : ''} aria-pressed={s.diffSplit} onClick={() => setSetting('diffSplit', true)}>Split</button>
+              </div>
             </div>
           </div>
           <div className="settings-group">
-            <div className="settings-h">Shortcuts</div>
+            <div className="settings-h">Keyboard &amp; mouse</div>
             {GROUPS.map(g => (
               <div key={g} className="sc-group">
                 <div className="sc-group-name">{g}</div>

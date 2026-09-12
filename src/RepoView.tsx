@@ -11,6 +11,8 @@ import SearchBar from './SearchBar'
 import type { OpKind } from '../server/operation.ts'
 import { label, matchLocal, stepMatch } from './search'
 import { toastErr } from './Toast'
+import { useSetting } from './settingsStore'
+import { tilde } from './paths'
 
 // diff2html + highlight.js (~1 MB, 82% of the old main bundle) stay out until a
 // file is actually clicked; xterm.js + panel likewise until the terminal opens
@@ -31,15 +33,13 @@ const termOpenByRepo = new Map<string, boolean>()
 const graphFp = (commits: Commit[], hasMore: boolean, stashes: StashEntry[] = []) =>
   commits.map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + (hasMore ? '+' : '') + stashes.map(s => s.hash).join(',')
 
-// One page, the server's own default and the client's paging step.
-const PAGE = 200
 // Shortest gap between two refreshes triggered by returning to the tab.
 const VIS_REFRESH_MS = 10_000
 // Probe fingerprint for a silent refresh: the first page plus the stash list, which
 // arrives whole at any limit. No hasMore — a one-page probe always reports more
 // while 150 rows are loaded, and that difference isn't a change in the repo.
-const headFp = (commits: Commit[], stashes: StashEntry[] = []) =>
-  commits.slice(0, PAGE).map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + stashes.map(s => s.hash).join(',')
+const headFp = (commits: Commit[], stashes: StashEntry[], page: number) =>
+  commits.slice(0, page).map(c => `${c.hash}\x1f${c.refs.join(',')}`).join('\n') + stashes.map(s => s.hash).join(',')
 // x/y, not the collapsed status: staging a modified file moves it from ".M" to "M."
 // while `status` stays "M", so hashing only that made staging invisible to the panel
 // the branch header goes in too: a push changes nothing about the files, but leaves
@@ -54,7 +54,7 @@ const NO_BRANCH: BranchHeader = { head: null, upstream: null, ahead: 0, behind: 
 
 type Operation = { kind: OpKind; label: string }
 
-export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string; onRemove: () => void; hasTerminal: boolean }) {
+export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: string; home: string; onRemove: () => void; hasTerminal: boolean }) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [remotes, setRemotes] = useState<string[]>([])
@@ -95,6 +95,14 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
     setCur(-1)
   }, [])
 
+  // One page: the client's paging step, and the limit every /api/graph request
+  // carries. A ref rather than a dep of `refresh` — re-creating that callback would
+  // re-run the mount effect, which fetches from the remote; the next load reads the
+  // new size on its own.
+  const pageSize = useSetting('pageSize')
+  const page = useRef(pageSize)
+  page.current = pageSize
+
   const fps = useRef({ graph: '', status: '', head: '' })
   const loaded = useRef(0)
   loaded.current = commits.length
@@ -124,8 +132,8 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
       .catch(() => {})
       .then(() => run(false, full, true))
     const g = ++gen.current
-    const probe = !full && loaded.current > PAGE
-    const limit = probe ? PAGE : Math.max(loaded.current, PAGE)
+    const probe = !full && loaded.current > page.current
+    const limit = probe ? page.current : Math.max(loaded.current, page.current)
     return Promise.all([
       api<{ commits: Commit[]; hasMore: boolean; remotes: string[]; stashes: StashEntry[]; githubUrl: string | null }>(`/api/graph?${q}&limit=${limit}`),
       api<{ files: StatusEntry[]; branch: BranchHeader; operation: Operation | null }>(`/api/status?${q}`),
@@ -136,9 +144,9 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
       if (probe) {
         // page 1 hasn't moved: nothing loaded below it can have changed either, so
         // the rows stay as they are. Moved → refetch the whole loaded range now.
-        if (headFp(gRes.commits, gRes.stashes) !== fps.current.head) run(true, true)
+        if (headFp(gRes.commits, gRes.stashes, page.current) !== fps.current.head) run(true, true)
       } else {
-        fps.current.head = headFp(gRes.commits, gRes.stashes)
+        fps.current.head = headFp(gRes.commits, gRes.stashes, page.current)
         const gf = graphFp(gRes.commits, gRes.hasMore, gRes.stashes)
         if (fps.current.graph !== gf) {
           fps.current.graph = gf
@@ -294,7 +302,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
 
   const loadMore = useCallback(() => {
     const g = ++gen.current
-    api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&skip=${loaded.current}`)
+    api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&skip=${loaded.current}&limit=${page.current}`)
       .then(res => {
         if (g !== gen.current) return
         setCommits(prev => {
@@ -331,7 +339,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
     // requests instead of dozens of sequential `loadMore` pages.
     const g = ++gen.current
     void (async () => {
-      let limit = Math.max(loaded.current, PAGE)
+      let limit = Math.max(loaded.current, page.current)
       while (limit < 5000) {
         limit = Math.min(5000, limit * 2)
         const res = await api<{ commits: Commit[]; hasMore: boolean }>(`/api/graph?${q}&limit=${limit}`)
@@ -340,7 +348,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
         setHasMore(res.hasMore)
         // both fingerprints, or the next silent refresh re-renders the whole list for nothing
         fps.current.graph = graphFp(res.commits, res.hasMore, stashes)
-        fps.current.head = headFp(res.commits, stashes)
+        fps.current.head = headFp(res.commits, stashes, page.current)
         if (res.commits.some(c => c.hash === hash)) {
           setSelection({ kind: 'commit', hash })
           return
@@ -384,7 +392,7 @@ export default function RepoView({ repo, onRemove, hasTerminal }: { repo: string
       {/* three zones: repo identity left, repo actions centred, app controls right */}
       <div className="toolbar">
         <div className="tb-left">
-          <span className="repo-path">{repo}</span>
+          <span className="repo-path" title={repo}>{tilde(repo, home)}</span>
           {githubUrl && (
             <a className="github-link" href={githubUrl} target="_blank" rel="noreferrer" title="Open on GitHub" aria-label="Open on GitHub">
               <GithubIcon size={14} />

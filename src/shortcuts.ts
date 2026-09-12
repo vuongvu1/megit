@@ -25,6 +25,10 @@ export const SHORTCUTS: Shortcut[] = [
   { group: 'View', keys: 'r', label: 'Refresh (outside a text field)' },
   { group: 'View', keys: 'Mod+Shift+0', label: 'Toggle light / dark theme' },
   { group: 'Dialogs', keys: 'Escape', label: 'Close dialog' },
+  // Same table, mouse half: the gestures are discoverable only from a chip's
+  // title attribute otherwise, and nothing at all announces the row menus.
+  { group: 'Mouse', keys: 'Double-click', label: 'Checkout the branch chip under the pointer' },
+  { group: 'Mouse', keys: 'Right-click', label: 'Actions for a commit, ref chip, stash or uncommitted-changes row' },
 ]
 
 export const GROUPS = [...new Set(SHORTCUTS.map(s => s.group))]

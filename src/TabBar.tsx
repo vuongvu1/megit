@@ -1,9 +1,9 @@
 import { useState } from 'react'
+import { base, tilde } from './paths'
 
-const base = (p: string) => p.split('/').filter(Boolean).pop() ?? p
-
-export default function TabBar({ repos, active, onSelect, onAdd, onClose, onReorder, onReorderEnd, onSettings }: {
+export default function TabBar({ repos, home, active, onSelect, onAdd, onClose, onReorder, onReorderEnd, onSettings }: {
   repos: string[]
+  home: string
   active: string | null
   onSelect: (r: string) => void
   onAdd: () => void
@@ -25,7 +25,7 @@ export default function TabBar({ repos, active, onSelect, onAdd, onClose, onReor
         <div
           key={r}
           className={`tab${r === active ? ' active' : ''}${i === dragIdx ? ' dragging' : ''}`}
-          title={r}
+          title={tilde(r, home)}
           draggable
           onClick={() => onSelect(r)}
           onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r); setDragIdx(i) }}

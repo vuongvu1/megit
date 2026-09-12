@@ -5,6 +5,7 @@ export type Settings = {
   zoom: number
   avatars: boolean
   diffSplit: boolean
+  pageSize: number // commits fetched per /api/graph request
 }
 
 export const ZOOM_MIN = 0.8
@@ -24,11 +25,17 @@ export const ZOOM_PRESETS = [
 export const nearestPreset = (zoom: number) =>
   ZOOM_PRESETS.reduce((a, b) => (Math.abs(b.zoom - zoom) < Math.abs(a.zoom - zoom) ? b : a))
 
+// How many commits one /api/graph request brings back. 150 fills a tall window
+// with rows to spare and is the quickest to first paint on a 10k-commit repo;
+// the larger steps trade that for fewer round-trips while scrolling.
+export const PAGE_SIZES = [100, 150, 200, 500, 1000] as const
+
 export const DEFAULTS: Settings = {
   fontFamily: '',
   zoom: 1,
   avatars: true,
   diffSplit: false,
+  pageSize: 150,
 }
 
 // Snap before clamping so a float that arrived from repeated += 0.1 lands on a
@@ -52,6 +59,9 @@ export function parse(raw: string | null, defaults: Settings): Settings {
     zoom: typeof o.zoom === 'number' && Number.isFinite(o.zoom) ? clampZoom(o.zoom) : defaults.zoom,
     avatars: typeof o.avatars === 'boolean' ? o.avatars : defaults.avatars,
     diffSplit: typeof o.diffSplit === 'boolean' ? o.diffSplit : defaults.diffSplit,
+    // Allow-list rather than a clamp: an arbitrary stored number would light no
+    // option in the dialog and could ask the server for a page it caps anyway.
+    pageSize: PAGE_SIZES.includes(o.pageSize as (typeof PAGE_SIZES)[number]) ? o.pageSize! : defaults.pageSize,
   }
 }
 

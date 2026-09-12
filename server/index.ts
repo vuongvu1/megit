@@ -76,7 +76,9 @@ const repoGuard: Handler = (req, res, next) => {
 
 // Every route that hands the client a Config goes through this, so the terminal
 // capability can't be clobbered by a later /api/active or /api/repos response.
-const withCaps = (c: Config) => ({ ...c, hasTerminal: hasPty() })
+// home rides along so the client can print ~/ instead of the full prefix; the
+// server is the only side that knows it.
+const withCaps = (c: Config) => ({ ...c, hasTerminal: hasPty(), home: homedir() })
 
 app.get('/api/config', (_req, res) => res.json(withCaps(loadConfig())))
 
