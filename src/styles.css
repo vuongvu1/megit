@@ -120,12 +120,12 @@ button:hover { background: var(--border); }
      high zoom level shrinks the dialog instead of clipping it. */
   width: 620px; max-width: 92%; display: flex; flex-direction: column;
 }
-.modal.settings .modal-head { padding: var(--s3) var(--s5); }
+.modal.settings .modal-head { padding: var(--s3); }
 .modal.settings .modal-head b { font-size: var(--t3); color: var(--fg); }
 /* Icon-only, so it needs the aria-label a text button must not have. */
 .settings-close { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; background: none; color: var(--fg-dim); border-radius: 4px; }
 .settings-close:hover { background: var(--bg-hover); color: var(--fg); }
-.settings-body { flex: 1; overflow-y: auto; padding: var(--s4) var(--s5) var(--s5); }
+.settings-body { flex: 1; overflow-y: auto; padding: var(--s4) var(--s3) var(--s5); }
 
 /* 24px between sections, 8px from a heading to the rows it owns: the heading
    binds downward to its group instead of floating between two. */
@@ -153,15 +153,17 @@ button:hover { background: var(--border); }
 .modal.settings input[type=checkbox] { width: 15px; height: 15px; margin: 0; justify-self: end; accent-color: #5a80b0; }
 .modal.settings .theme-switch { justify-self: end; }
 /* Segmented, like the diff toolbar's Unified|Split, and filling the control column
-   exactly so it aligns with the selects. Each button is its own label: the "aA"
-   renders at the size that button applies, so the control demonstrates rather
-   than describes. Percentages stay in the tooltip for anyone who wants them. */
-.zoom-presets { display: grid; grid-template-columns: repeat(4, 1fr); }
-.zoom-presets button { display: inline-flex; align-items: center; justify-content: center; height: var(--ctrl-h); padding: 0; border-radius: 0; color: var(--fg-dim); }
-.zoom-presets button + button { border-left: none; }
-.zoom-presets button:first-child { border-radius: 5px 0 0 5px; }
-.zoom-presets button:last-child { border-radius: 0 5px 5px 0; }
-.zoom-presets button.active { background: var(--bg-selected); color: var(--fg); }
+   exactly so it aligns with the selects. auto-columns, not a fixed count: the
+   same class serves the four zoom presets and the two diff modes. */
+.settings-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.settings-seg button { display: inline-flex; align-items: center; justify-content: center; height: var(--ctrl-h); padding: 0; border-radius: 0; color: var(--fg-dim); }
+.settings-seg button + button { border-left: none; }
+.settings-seg button:first-child { border-radius: 5px 0 0 5px; }
+.settings-seg button:last-child { border-radius: 0 5px 5px 0; }
+.settings-seg button.active { background: var(--bg-selected); color: var(--fg); }
+/* Each zoom button is its own label: the "aA" renders at the size that button
+   applies, so the control demonstrates rather than describes. Percentages stay
+   in the tooltip for anyone who wants them. */
 .zoom-presets [data-z="sm"] { font-size: 10px; }
 .zoom-presets [data-z="md"] { font-size: 12px; }
 .zoom-presets [data-z="lg"] { font-size: 14px; }

@@ -13,7 +13,7 @@ Published to npm as **`megit-app`** (the name `megit` was taken); the installed 
 Every change is judged against it. Concretely:
 
 - Keep the main bundle lean — heavy dependencies (xterm.js is the precedent) go in lazy `React.lazy`/dynamic-`import()` chunks; server-side natives (node-pty) load via dynamic `import()` on first use. Nothing may cost anything until the user actually uses it.
-- `/api/graph` must stay fast on 10k+-commit repos. Commits page in at 200 per request (server default and client floor) — don't raise it without measuring.
+- `/api/graph` must stay fast on 10k+-commit repos. Commits page in at 150 per request (the client default; the server still defaults to 200 for a request that omits `limit`). The size is a user setting — `PAGE_SIZES` in `settings.ts` — so don't add a larger option without measuring it.
 - Avoid re-renders: RepoView gates `setState` behind fingerprint comparison; keep that pattern for new data flows.
 - Client-only deps belong in `devDependencies` — Vite inlines them into `dist/`. Runtime `dependencies` is deliberately just ws (+ optional node-pty); routing/static serving is `server/http.ts` on `node:http`. Adding a runtime dep means adding its whole transitive tree to every user's install — justify it against writing the few lines instead.
 - Measure before claiming: `curl -w '%{time_total}'` on API routes, `pnpm build` chunk sizes, DOM row counts / `performance.getEntriesByType` in the browser. Verify against a big repo (`~/WORKSPACE/BLS/bikeleasing-app`, 14k commits — register temporarily, then remove from config).

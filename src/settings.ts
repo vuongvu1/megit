@@ -25,17 +25,17 @@ export const ZOOM_PRESETS = [
 export const nearestPreset = (zoom: number) =>
   ZOOM_PRESETS.reduce((a, b) => (Math.abs(b.zoom - zoom) < Math.abs(a.zoom - zoom) ? b : a))
 
-// How many commits one /api/graph request brings back. 200 is the server's own
-// default and the fastest option on a 10k-commit repo; the larger steps trade a
-// slower first paint for fewer round-trips while scrolling.
-export const PAGE_SIZES = [100, 200, 500, 1000] as const
+// How many commits one /api/graph request brings back. 150 fills a tall window
+// with rows to spare and is the quickest to first paint on a 10k-commit repo;
+// the larger steps trade that for fewer round-trips while scrolling.
+export const PAGE_SIZES = [100, 150, 200, 500, 1000] as const
 
 export const DEFAULTS: Settings = {
   fontFamily: '',
   zoom: 1,
   avatars: true,
   diffSplit: false,
-  pageSize: 200,
+  pageSize: 150,
 }
 
 // Snap before clamping so a float that arrived from repeated += 0.1 lands on a
