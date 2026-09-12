@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { api } from './api'
 import { useSetting } from './settingsStore'
 
+// The only external host the client contacts:
+//
+//   gravatar.com/avatar/<sha256 of email> — fallback portrait, ?d=404 so a miss
+//                                           is a 404 and never a tracking pixel
+//
+// GitHub avatar URLs also render here, but the server resolves them (see
+// server/avatars.ts). Both paths are gated on the "author avatars" setting
+// below, and the hash is computed locally — the email itself never leaves.
+// See SECURITY.md, "Threat model".
+
 // email -> avatar URL, or null when nothing resolves (fall back to initials)
 const cache = new Map<string, string | null>()
 const pending = new Map<string, Promise<string | null>>()

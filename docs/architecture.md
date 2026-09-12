@@ -11,7 +11,7 @@ src/                             server/
   GraphView.tsx dumb renderer      watch.ts   fs.watch → debounce → SSE
   lanes.ts     ← the graph         term.ts    PTY over WebSocket
   search.ts    client-first find   config.ts  ~/.config/megit/config.json
-  DiffView.tsx diff2html + hljs    avatars.ts Gravatar lookup
+  DiffView.tsx diff2html + hljs    avatars.ts GitHub avatar lookup
 ```
 
 There is no ORM, no state library, and no shared model layer. The server produces plain JSON; the client owns all presentation.
