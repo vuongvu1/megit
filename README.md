@@ -1,6 +1,6 @@
 # <img src="public/logo.svg" width="28"/> megit
 
-[![npm](https://img.shields.io/npm/v/megit-app)](https://www.npmjs.com/package/megit-app) [![CI](https://github.com/vuongvu1/megit/actions/workflows/ci.yml/badge.svg)](https://github.com/vuongvu1/megit/actions/workflows/ci.yml) [![Socket](https://badge.socket.dev/npm/package/megit-app/latest)](https://socket.dev/npm/package/megit-app)
+[![npm](https://img.shields.io/npm/v/megit-app?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/megit-app) [![CI](https://img.shields.io/github/actions/workflow/status/vuongvu1/megit/ci.yml?branch=main&logo=github&label=CI)](https://github.com/vuongvu1/megit/actions/workflows/ci.yml) [![downloads](https://img.shields.io/npm/dm/megit-app?color=0A7EA4)](https://www.npmjs.com/package/megit-app) [![unpacked size](https://img.shields.io/npm/unpacked-size/megit-app?color=0A7EA4)](https://www.npmjs.com/package/megit-app?activeTab=code) [![license](https://img.shields.io/npm/l/megit-app?color=0A7EA4)](LICENSE)
 
 A git repository viewer that runs in your browser. Commit graph with real branch lanes, diffs including your uncommitted work, stashes, staging, search, and a shell — pointed at as many local repos as you like, each in its own tab.
 
