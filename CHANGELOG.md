@@ -9,6 +9,13 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-16
+
+### Changed
+
+- The bundled client is built on React 19.3 and Vite 8.3. React is inlined into
+  `dist/`, so the upgrade ships — and costs 8.6 KB gzip on the first-load chunk.
+
 ## [0.12.0] - 2026-09-12
 
 ### Added
@@ -289,7 +296,8 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — node-pty is an optionalDependency with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/vuongvu1/megit/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/vuongvu1/megit/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/vuongvu1/megit/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/vuongvu1/megit/compare/v0.10.0...v0.11.0
