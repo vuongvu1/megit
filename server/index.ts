@@ -8,6 +8,7 @@ import { loadConfig, saveConfig, isPermutation, touchRecent, type Config } from 
 import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { pickOperation, STATE_FILES, type OpKind } from './operation.ts'
+import { checkoutPlan } from './checkout.ts'
 import { subscribe } from './watch.ts'
 import { wireTerminal, hasPty } from './term.ts'
 
@@ -308,6 +309,9 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
   const repo = String(req.query.repo)
   const branch = String(req.body.branch ?? '')
   const reset = req.body.reset === true
+  // the click was on the origin/x chip: the user asked for the remote's state, so
+  // a local branch merely ahead is still a divergence from what they pointed at
+  const fromRemote = req.body.fromRemote === true
   // reject option-like names so the branch can never be parsed as a git flag
   if (!branch || branch.startsWith('-')) {
     res.status(400).json({ error: 'invalid branch name' })
@@ -334,16 +338,18 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     }
     const localOnly = Number((await git(repo, ['rev-list', '--count', `${remoteRef}..refs/heads/${branch}`])).trim())
     const remoteOnly = Number((await git(repo, ['rev-list', '--count', `refs/heads/${branch}..${remoteRef}`])).trim())
-    if (localOnly === 0) {
-      // equal or strictly behind: checkout, then fast-forward to the remote
+    const plan = checkoutPlan(localOnly, remoteOnly, reset, fromRemote)
+    if (plan === 'plain' || plan === 'fast-forward') {
+      // equal, ahead-only, or strictly behind: checkout, and fast-forward only when
+      // there is nothing local to lose by doing so
       await stash(`WIP before checkout ${branch}`)
       await git(repo, ['checkout', branch])
-      if (remoteOnly > 0) await git(repo, ['merge', '--ff-only', remoteRef])
-      res.json({ ok: true, forwarded: remoteOnly, stashed: dirty })
+      if (plan === 'fast-forward') await git(repo, ['merge', '--ff-only', remoteRef])
+      res.json({ ok: true, forwarded: plan === 'fast-forward' ? remoteOnly : 0, stashed: dirty })
       return
     }
-    if (!reset) {
-      // diverged (or ahead): the client asks the user before anything destructive
+    if (plan === 'ask') {
+      // genuinely diverged: the client asks the user before anything destructive
       res.json({ diverged: true, remoteRef, ahead: localOnly, behind: remoteOnly })
       return
     }

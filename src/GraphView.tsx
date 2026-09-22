@@ -185,7 +185,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   onSelect: () => void
   dashes: Dash[]
   trail: TrailRow | null
-  onCheckout: (branch: string) => void
+  onCheckout: (branch: string, fromRemote?: boolean) => void
   onChipMenu: (e: ReactMouseEvent, chip: RefChip, hash: string) => void
   onRowMenu: (e: ReactMouseEvent, hash: string) => void
 }) {
@@ -211,7 +211,7 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
             className={`ref-chip${chip.head ? ' head' : ''}`}
             style={{ borderColor: color(row.lane), '--n-icons': nIcons } as CSSProperties}
             title={canCheckout ? `${chip.name} — double-click to checkout, right-click for actions` : `${chip.name} — right-click for actions`}
-            onDoubleClick={canCheckout ? () => onCheckout(chip.name) : undefined}
+            onDoubleClick={canCheckout ? () => onCheckout(chip.name, !chip.local) : undefined}
             // a chip's menu replaces the row's — without this the row handler
             // fires next and overwrites it with the commit menu
             onContextMenu={e => { e.stopPropagation(); onChipMenu(e, chip, c.hash) }}
@@ -347,11 +347,11 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
     api(`/api/branch?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
   const branchApi = (body: object, label: string) =>
     onBusy(branchPost(body).catch(err => toastErr(`${label} failed:\n${(err as Error).message}`)))
-  const checkout = (branch: string) => {
+  const checkout = (branch: string, fromRemote = false) => {
     type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number }
     const post = (body: object) =>
       api<CheckoutRes>(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
-    onBusy(post({ branch })
+    onBusy(post({ branch, fromRemote })
       .then(r => {
         if (!r.diverged) return
         // ponytail: native confirm as the popup; custom modal when it grates
@@ -359,7 +359,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
           `Local '${branch}' differs from ${r.remoteRef} (${r.ahead} ahead, ${r.behind} behind).\n\n` +
           `OK — Reset local to ${r.remoteRef} (uncommitted changes go to a stash)\nCancel — keep everything as is`,
         )
-        if (ok) return post({ branch, reset: true })
+        if (ok) return post({ branch, fromRemote, reset: true })
       })
       .catch(err => toastErr(`Checkout failed:\n${(err as Error).message}`)))
   }
@@ -407,7 +407,7 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
     canLink: !!githubUrl,
     run: action => {
       switch (action) {
-        case 'checkout': return checkout(chip.name)
+        case 'checkout': return checkout(chip.name, !chip.local)
         case 'pull': return void branchApi({ action: 'pull' }, 'Pull')
         case 'push': return void branchApi({ action: 'push' }, 'Push')
         case 'merge': return void branchApi({ action: 'merge', branch: chipRef(chip) }, 'Merge')
