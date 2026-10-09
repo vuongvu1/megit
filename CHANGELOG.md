@@ -9,6 +9,13 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-09
+
+### Added
+
+- The recent-projects list in the add-repo dialog is keyboard-driven: ↑/↓ move through
+  the filtered list, Enter opens the highlighted repo.
+
 ## [0.12.2] - 2026-09-22
 
 ### Fixed
@@ -305,7 +312,8 @@ First public release.
 - Windows (arm64, x64): builds and runs, but untested on real hardware — recursive `fs.watch` crashes the test worker there, so auto-refresh is not covered by CI
 - Linux: everything except the terminal — node-pty is an optionalDependency with no Linux prebuild, and the terminal button is hidden when it is unavailable
 
-[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/vuongvu1/megit/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/vuongvu1/megit/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/vuongvu1/megit/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/vuongvu1/megit/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/vuongvu1/megit/compare/v0.11.1...v0.12.0

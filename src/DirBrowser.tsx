@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { api, jsonInit } from './api'
 import type { Config } from './App'
 import { base, tilde } from './paths'
@@ -55,6 +55,7 @@ export default function DirBrowser({ recent, open, home, active, onPicked, onSel
   const [dir, setDir] = useState<FsDir | null>(null)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
+  const [cursor, setCursor] = useState(0)
 
   const load = (path?: string) => {
     setError('')
@@ -74,6 +75,19 @@ export default function DirBrowser({ recent, open, home, active, onPicked, onSel
     const q = query.trim().toLowerCase()
     return q ? recent.filter(r => r.toLowerCase().includes(q)) : recent
   }, [recent, query])
+
+  // Focus never leaves the filter input, so the keys live there: arrows move the
+  // highlight through the filtered list, Enter opens it.
+  const onFilterKey = (e: ReactKeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      const d = e.key === 'ArrowDown' ? 1 : -1
+      setCursor(c => Math.max(0, Math.min(shown.length - 1, c + d)))
+    } else if (e.key === 'Enter' && shown[cursor]) {
+      e.preventDefault()
+      openRecent(shown[cursor])
+    }
+  }
 
   const pick = (path: string) =>
     api<Config>('/api/repos', jsonInit('POST', { path })).then(onPicked).catch(e => setError(e.message))
@@ -101,12 +115,17 @@ export default function DirBrowser({ recent, open, home, active, onPicked, onSel
               className="recent-filter"
               placeholder="Search…"
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => { setQuery(e.target.value); setCursor(0) }}
+              onKeyDown={onFilterKey}
               autoFocus
             />
             <ul className="dirlist">
-              {shown.map(r => (
-                <li key={r} className={r === active ? 'sel' : ''}>
+              {shown.map((r, i) => (
+                <li
+                  key={r}
+                  className={`${r === active ? 'sel' : ''}${i === cursor ? ' cur' : ''}`}
+                  ref={i === cursor ? el => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+                >
                   <RepoIcon path={r} />
                   <span className="dirname" title={tilde(r, home)} onClick={() => openRecent(r)}>{base(r)}</span>
                   {open.includes(r) && <span className="recent-dot" title="open" />}
