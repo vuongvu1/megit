@@ -229,14 +229,20 @@ integration('subscribe (integration, real fs + timers)', () => {
       mkdirSync(join(dir, 'nested'))
       let events = 0
       const unsub = subscribe(dir, () => { events++ }, () => {})
-      setIgnored(dir, ['nested'])
-      await sleep(300) // FSEvents warm-up
-      writeFileSync(join(dir, 'nested', 'x.txt'), 'x')
-      await sleep(2500) // past the debouncer's max-wait
-      expect(events).toBe(0)
-      writeFileSync(join(dir, 'top.txt'), 'x')
-      await waitFor(() => events >= 1, 5000)
-      unsub()
+      try {
+        setIgnored(dir, ['nested'])
+        // FSEvents can deliver `git init`'s own .git/HEAD writes after subscribe —
+        // a real, relevant event. Let it flush past the 400 ms trailing debounce, then count.
+        await sleep(1000)
+        events = 0
+        writeFileSync(join(dir, 'nested', 'x.txt'), 'x')
+        await sleep(2500) // past the debouncer's max-wait
+        expect(events).toBe(0)
+        writeFileSync(join(dir, 'top.txt'), 'x')
+        await waitFor(() => events >= 1, 5000)
+      } finally {
+        unsub() // even on failure, so afterEach's leak check reports this test only once
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
