@@ -11,6 +11,13 @@ on:
   push:
     branches: [main]
 
+# Two merges seconds apart start two runs that both see the version unpublished;
+# the loser dies on npm's 409 (0.14.0: #55 and #54). Queued, the second run starts
+# after the first published and no-ops. Never cancel: that could kill a publish midway.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write # create the tag and the GitHub release
   id-token: write # OIDC identity for npm trusted publishing (and its provenance)
