@@ -56,7 +56,9 @@ export default function WorktreeStrip({ repo, worktrees, home, onOpen, onBusy, o
   if (!open) {
     return (
       <div className="wt-strip collapsed">
-        <button className="wt-toggle" onClick={toggle} title="Show worktrees" aria-label="Show worktrees" aria-expanded={false}>⎇</button>
+        <button className="wt-toggle" onClick={toggle} title={`Show ${worktrees.length} worktrees`} aria-label={`Show ${worktrees.length} worktrees`} aria-expanded={false}>
+          ⎇<span className="wt-total">{worktrees.length}</span>
+        </button>
       </div>
     )
   }
@@ -65,7 +67,12 @@ export default function WorktreeStrip({ repo, worktrees, home, onOpen, onBusy, o
       <div className="wt-strip" ref={strip} style={{ width }}>
         <div className="wt-head">
           <span>Worktrees</span>
-          <button className="wt-toggle" onClick={toggle} title="Hide worktrees" aria-label="Hide worktrees" aria-expanded>«</button>
+          <button className="wt-toggle" onClick={toggle} title="Hide worktrees" aria-label="Hide worktrees" aria-expanded>
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3.5L3.5 8 8 12.5" />
+              <path d="M12.5 3.5L8 8l4.5 4.5" />
+            </svg>
+          </button>
         </div>
         {worktrees.map((w, i) => (
           <div key={w.path} className="wt-item">
