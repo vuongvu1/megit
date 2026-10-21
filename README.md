@@ -53,6 +53,10 @@ A sticky WIP row sits at the top of the list whenever the worktree is dirty, con
 
 Stashes appear as their own rows, attached to the commit they were taken from with a dotted connector, and can be popped, deleted, or retitled in place.
 
+### Worktrees
+
+A repository with linked worktrees gets a strip beside the graph listing each one with its branch and changed-file count. Click a row to open it in its own purple `⎇` tab; counts update live, and a branch checked out elsewhere is marked on its chip and offers to open that tab instead of failing the checkout.
+
 ### Diffs
 
 Click a commit to see its changed files, then a file to see the diff. Syntax highlighting, word-level intra-line highlighting, collapsed context you can expand a hunk at a time, and a per-file "Viewed" checkbox.

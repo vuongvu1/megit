@@ -175,3 +175,30 @@ export function parseNameStatus(raw: string): { status: string; path: string }[]
   }
   return out
 }
+
+export type WorktreeEntry = { path: string; head: string; branch: string | null; prunable: boolean; bare: boolean }
+
+// `git worktree list --porcelain` (git ≥ 2.7): `key value` lines, records
+// separated by a blank line. Unknown keys (locked, …) are ignored.
+// ponytail: a path containing a newline mis-parses — unrealistic; `-z` (git ≥ 2.36)
+// is the upgrade once older git no longer matters.
+export function parseWorktrees(raw: string): WorktreeEntry[] {
+  const out: WorktreeEntry[] = []
+  let cur: WorktreeEntry | null = null
+  for (const f of raw.split('\n')) {
+    if (!f) {
+      cur = null
+      continue
+    }
+    const sp = f.indexOf(' ')
+    const key = sp < 0 ? f : f.slice(0, sp)
+    const val = sp < 0 ? '' : f.slice(sp + 1)
+    if (key === 'worktree') out.push((cur = { path: val, head: '', branch: null, prunable: false, bare: false }))
+    else if (!cur) continue
+    else if (key === 'HEAD') cur.head = val
+    else if (key === 'branch') cur.branch = val.replace(/^refs\/heads\//, '')
+    else if (key === 'prunable') cur.prunable = true
+    else if (key === 'bare') cur.bare = true
+  }
+  return out
+}

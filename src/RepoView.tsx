@@ -9,6 +9,8 @@ import ActionBar from './ActionBar'
 import ConflictBanner from './ConflictBanner'
 import SearchBar from './SearchBar'
 import type { OpKind } from '../server/operation.ts'
+import type { Worktree } from '../server/worktrees.ts'
+import WorktreeStrip from './WorktreeStrip'
 import { label, matchLocal, stepMatch } from './search'
 import { toastErr } from './Toast'
 import { useSetting } from './settingsStore'
@@ -54,7 +56,7 @@ const NO_BRANCH: BranchHeader = { head: null, upstream: null, ahead: 0, behind: 
 
 type Operation = { kind: OpKind; label: string }
 
-export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: string; home: string; onRemove: () => void; hasTerminal: boolean }) {
+export default function RepoView({ repo, home, linked, onOpen, onRemove, hasTerminal }: { repo: string; home: string; linked: boolean; onOpen: (path: string) => void; onRemove: () => void; hasTerminal: boolean }) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [remotes, setRemotes] = useState<string[]>([])
@@ -103,12 +105,27 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
   const page = useRef(pageSize)
   page.current = pageSize
 
-  const fps = useRef({ graph: '', status: '', head: '' })
+  const [worktrees, setWorktrees] = useState<Worktree[]>([])
+  const fps = useRef({ graph: '', status: '', head: '', wt: '' })
   const loaded = useRef(0)
   loaded.current = commits.length
   const gen = useRef(0)
 
   const q = `repo=${encodeURIComponent(repo)}`
+
+  // own counter, not `gen`: a worktree poll must neither supersede nor be superseded by
+  // a graph refresh, only by a newer poll. Errors are swallowed — the strip is extra.
+  const wtGen = useRef(0)
+  const loadWorktrees = useCallback(() => {
+    const g = ++wtGen.current
+    api<{ worktrees: Worktree[] }>(`/api/worktrees?${q}`).then(r => {
+      if (g !== wtGen.current) return
+      const fp = JSON.stringify(r.worktrees)
+      if (fp === fps.current.wt) return
+      fps.current.wt = fp
+      setWorktrees(r.worktrees)
+    }).catch(() => {})
+  }, [q])
 
   // `full` refetches every row currently loaded; a silent refresh instead probes the
   // first page and only pays for the rest once that page has actually moved. An fs
@@ -128,9 +145,14 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
     // remote) is swallowed so the local read still lands. Re-entering rather than
     // awaiting inline keeps `gen` claimed *after* the fetch, so an SSE refresh firing
     // during those seconds can't supersede this one and drop its results.
-    if (!silent && !fetched) return api(`/api/branch?${q}`, jsonInit('POST', { action: 'fetch' }))
-      .catch(() => {})
-      .then(() => run(false, full, true))
+    // Manual refreshes also re-poll the worktree strip: with SSE dead, they are the
+    // only thing that can still move its counts. (First paint has its own poll.)
+    if (!silent && !fetched) {
+      loadWorktrees()
+      return api(`/api/branch?${q}`, jsonInit('POST', { action: 'fetch' }))
+        .catch(() => {})
+        .then(() => run(false, full, true))
+    }
     const g = ++gen.current
     const probe = !full && loaded.current > page.current
     const limit = probe ? page.current : Math.max(loaded.current, page.current)
@@ -181,7 +203,25 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
       // background refreshes fail silently — except a gone repo, which must surface
       if (!silent || e.status === 410) setError({ msg: e.message, gone: e.status === 410 })
     })
-  }, [q])
+  }, [q, loadWorktrees])
+
+  // cleanup bumps the counter so a poll still in flight at unmount can't setState
+  useEffect(() => { loadWorktrees(); return () => { wtGen.current++ } }, [loadWorktrees])
+  // App's `open` is a fresh closure every render; GraphView is memo'd, so it gets a
+  // stable wrapper or every App render would re-render the whole graph
+  const openRef = useRef(onOpen)
+  openRef.current = onOpen
+  const openWt = useCallback((path: string) => openRef.current(path), [])
+  // branch → path for branches checked out elsewhere; GraphView badges those chips.
+  // Keyed on the pairs, not `worktrees`: a sibling's `changed`/`head` moving must not
+  // hand the memo'd GraphView a new Map and re-render every row.
+  const heldKey = worktrees.filter(w => !w.current && w.branch).map(w => `${w.branch}\0${w.path}`).join('\0')
+  const held = useMemo(() => {
+    const m = new Map<string, string>()
+    const parts = heldKey ? heldKey.split('\0') : []
+    for (let i = 0; i < parts.length; i += 2) m.set(parts[i], parts[i + 1])
+    return m
+  }, [heldKey])
 
   // `fetched` on the initial load: App keys RepoView by repo, so every tab switch
   // remounts and this would otherwise pay a network fetch per switch. Only an explicit
@@ -226,10 +266,13 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
     let firstOpen = true
     // mount already fetched — don't fetch again if the tab regains focus right after
     let lastVis = performance.now()
+    const visible = () => document.visibilityState !== 'hidden'
     const kick = () => {
-      if (document.visibilityState !== 'hidden') refresh(true)
+      if (visible()) { refresh(true); loadWorktrees() }
     }
-    es.onmessage = kick
+    // `worktrees`: a sibling's folder changed — only the strip's counts can have moved
+    const kickWt = () => { if (visible()) loadWorktrees() }
+    es.onmessage = e => e.data === 'worktrees' ? kickWt() : kick()
     es.onopen = () => {
       // initial open: mount effect already fetched; reconnect: catch up on missed events
       if (firstOpen) { firstOpen = false; return }
@@ -243,11 +286,11 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
       // ponytail: fixed 10 s window, not a real throttle — enough for hand-speed flipping
       if (performance.now() - lastVis < VIS_REFRESH_MS) return
       lastVis = performance.now()
-      refresh()
+      refresh() // also re-polls worktrees: `worktrees` events skipped while hidden land here
     }
     document.addEventListener('visibilitychange', onVis)
     return () => { es.close(); document.removeEventListener('visibilitychange', onVis) }
-  }, [q, refresh])
+  }, [q, refresh, loadWorktrees])
 
   // Listed in shortcuts.ts for the Settings dialog — change one, change both.
   useEffect(() => {
@@ -380,7 +423,8 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
     return (
       <div className="empty">
         <div>
-          <div className="error">{error.msg}</div>
+          <div className="error">{error.gone && linked ? 'Worktree removed' : error.msg}</div>
+          {error.gone && linked && <div className="gone-path">{tilde(repo, home)}</div>}
           {error.gone ? <button onClick={onRemove}>Remove tab</button> : <button onClick={() => refresh()}>Retry</button>}
         </div>
       </div>
@@ -428,9 +472,12 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
       {operation && (
         <ConflictBanner op={operation} conflicts={conflicts} busy={busy} onAbort={onAbort} onContinue={() => conflictPost('continue')} />
       )}
+      {/* own row around .panes so the graph's percentage widths stay relative to .panes */}
+      <div className="panes-row">
+      <WorktreeStrip worktrees={worktrees} home={home} onOpen={onOpen} />
       <div className="panes" style={{ '--graph-w': selection ? `${graphPct}%` : '100%' } as CSSProperties}>
         <div className={busy ? 'graph-pane busy' : 'graph-pane'} style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
-          <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} githubUrl={githubUrl} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} />
+          <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} githubUrl={githubUrl} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} held={held} home={home} onOpen={openWt} />
           {searchSeq > 0 && (
             <SearchBar
               seq={searchSeq}
@@ -489,6 +536,7 @@ export default function RepoView({ repo, home, onRemove, hasTerminal }: { repo: 
             />
           </>
         )}
+      </div>
       </div>
       {termOpen && <Suspense fallback={<div className="term-panel" />}><TerminalPanel repo={repo} onClose={toggleTerm} /></Suspense>}
     </div>
