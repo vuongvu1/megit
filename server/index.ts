@@ -9,7 +9,7 @@ import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { pickOperation, STATE_FILES, type OpKind } from './operation.ts'
 import { checkoutPlan } from './checkout.ts'
-import { subscribe } from './watch.ts'
+import { heldBy, isLinkedWorktree, listWorktrees, watchRepo, worktreesWithCounts } from './worktrees.ts'
 import { wireTerminal, hasPty } from './term.ts'
 
 // JSON bodies are capped at 10mb by createApp — a resolved conflicted file goes
@@ -79,7 +79,8 @@ const repoGuard: Handler = (req, res, next) => {
 // capability can't be clobbered by a later /api/active or /api/repos response.
 // home rides along so the client can print ~/ instead of the full prefix; the
 // server is the only side that knows it.
-const withCaps = (c: Config) => ({ ...c, hasTerminal: hasPty(), home: homedir() })
+// linked: registered paths that are linked worktrees, so the client can badge their tabs
+const withCaps = (c: Config) => ({ ...c, hasTerminal: hasPty(), home: homedir(), linked: c.repos.filter(isLinkedWorktree) })
 
 app.get('/api/config', (_req, res) => res.json(withCaps(loadConfig())))
 
@@ -92,9 +93,15 @@ app.post('/api/repos', async (req, res) => {
     return
   }
   const cfg = loadConfig()
-  if (!cfg.repos.includes(path)) cfg.repos.push(path)
+  // `after` (opening a worktree from its sibling's tab) seats the new tab next to
+  // that one and skips recent — a worktree isn't a repo the user browsed to
+  const after = typeof req.body.after === 'string' ? cfg.repos.indexOf(req.body.after) : -1
+  if (!cfg.repos.includes(path)) {
+    if (after >= 0) cfg.repos.splice(after + 1, 0, path)
+    else cfg.repos.push(path)
+  }
   cfg.activeRepo = path
-  cfg.recent = touchRecent(cfg.recent, path)
+  if (after < 0) cfg.recent = touchRecent(cfg.recent, path)
   saveConfig(cfg)
   res.json(withCaps(cfg))
 })
@@ -282,6 +289,32 @@ app.get('/api/status', repoGuard, async (req, res) => {
   }
 })
 
+app.get('/api/worktrees', repoGuard, async (req, res) => {
+  try {
+    res.json({ worktrees: await worktreesWithCounts(String(req.query.repo), git) })
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message })
+  }
+})
+
+// Removes a linked worktree. The path is allow-listed against git's own list, minus
+// [0] (the main worktree, which git can't remove). Without force, git refuses a
+// worktree with uncommitted or untracked files — the client only sends force after
+// the user confirmed losing them. Locked worktrees stay git's error. The branch stays.
+app.post('/api/worktrees', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  try {
+    const [, ...linked] = await listWorktrees(repo, git)
+    const target = linked.find(w => w.path === req.body.path)
+    if (!target) throw httpError(400, 'not a linked worktree of this repo')
+    await git(repo, ['worktree', 'remove', ...(req.body.force === true ? ['--force'] : []), target.path])
+    res.json({ ok: true })
+  } catch (e) {
+    const err = e as Error
+    res.status((err as { status?: number }).status ?? 409).json({ error: err.message })
+  }
+})
+
 // resolves to a sha, or null when the ref doesn't exist (--quiet: exit 1, empty output)
 async function revParse(repo: string, ref: string): Promise<string | null> {
   const out = await git(repo, ['rev-parse', '--verify', '--quiet', ref], [0, 1])
@@ -318,6 +351,12 @@ app.post('/api/checkout', repoGuard, async (req, res) => {
     return
   }
   try {
+    // before any status/stash: git would refuse the checkout anyway, after we'd stashed
+    const holder = await heldBy(repo, branch, git)
+    if (holder) {
+      res.json({ heldBy: holder })
+      return
+    }
     const dirty = (await git(repo, ['status', '--porcelain'])).trim() !== ''
     const stash = (why: string) => stashIfDirty(repo, why)
     const remotes = (await git(repo, ['remote'])).split('\n').filter(Boolean)
@@ -483,6 +522,8 @@ app.post('/api/branch', repoGuard, async (req, res) => {
         const branch = mustExist(await locals(), req.body.branch, 'branch')
         const current = (await git(repo, ['branch', '--show-current'])).trim()
         if (branch === current) throw httpError(409, 'cannot delete the checked-out branch')
+        const holder = await heldBy(repo, branch, git)
+        if (holder) throw httpError(409, `'${branch}' is checked out in ${holder}`)
         // -d refuses to drop unmerged work; the client re-asks and sends force
         await git(repo, ['branch', req.body.force === true ? '-D' : '-d', branch])
         break
@@ -706,26 +747,32 @@ app.get('/api/events', repoGuard, (req, res) => {
   res.write(': connected\n\n')
   const ping = setInterval(() => res.write(': ping\n\n'), 30_000)
   let unsub: (() => void) | null = null
+  let done = false
+  // idempotent: onError can fire per watcher, and before watchRepo has resolved
   const cleanup = () => {
+    if (done) return
+    done = true
     clearInterval(ping)
     unsub?.()
     unsub = null
   }
-  try {
-    unsub = subscribe(
-      repo,
-      () => res.write('data: changed\n\n'),
-      () => {
-        cleanup()
-        res.end()
-      },
-    )
-  } catch {
-    // watcher couldn't start (EMFILE, permissions) — client degrades to manual refresh
+  const send = (kind: string) => {
+    if (!done) res.write(`data: ${kind}\n\n`)
+  }
+  watchRepo(repo, git, send, () => {
     cleanup()
     res.end()
-    return
-  }
+  }).then(
+    u => {
+      if (done) u() // closed or errored while the initial reconcile ran
+      else unsub = u
+    },
+    () => {
+      // watcher couldn't start (EMFILE, permissions) — client degrades to manual refresh
+      cleanup()
+      res.end()
+    },
+  )
   req.on('close', cleanup)
 })
 

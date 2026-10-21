@@ -15,8 +15,16 @@ export function isRelevant(rel: string): boolean {
   if (rel === '.git') return false
   if (NOISE.test(rel)) return false
   if (!rel.startsWith('.git/')) return true
-  const inner = rel.slice('.git/'.length)
-  return inner === 'HEAD' || inner === 'index' || inner === 'packed-refs' || inner.startsWith('refs/')
+  return isGitDirRelevant(rel.slice('.git/'.length))
+}
+
+// rel is relative to a git *common* dir. A linked worktree keeps its own HEAD and
+// index under worktrees/<name>/, so a commit there is visible from the common dir.
+export function isGitDirRelevant(rel: string): boolean {
+  return (
+    rel === 'HEAD' || rel === 'index' || rel === 'packed-refs' || rel.startsWith('refs/') ||
+    /^worktrees\/[^/]+\/(HEAD|index)$/.test(rel)
+  )
 }
 
 export type Debouncer = { hit: () => void; dispose: () => void }
@@ -46,7 +54,7 @@ export function createDebouncer(fire: () => void, delay = 400, maxWait = 2000): 
 }
 
 type Sub = { onChange: () => void; onError: () => void }
-type Entry = { watcher: FSWatcher; debouncer: Debouncer; subs: Set<Sub> }
+type Entry = { watcher: FSWatcher; debouncer: Debouncer; subs: Set<Sub>; ignored: string[] }
 
 const entries = new Map<string, Entry>()
 
@@ -55,8 +63,21 @@ export function activeWatcherCount(): number {
   return entries.size
 }
 
-// One shared recursive watcher per repo, alive only while subscribed.
-export function subscribe(repo: string, onChange: () => void, onError: () => void): () => void {
+// Events under these rel prefixes (e.g. a nested worktree inside the repo) are
+// dropped before the relevance filter. No-op when `repo` has no live entry.
+export function setIgnored(repo: string, prefixes: string[]): void {
+  const entry = entries.get(repo)
+  if (entry) entry.ignored = prefixes
+}
+
+// One shared recursive watcher per repo, alive only while subscribed. The first
+// subscriber's `relevant` filter wins for a path; callers pass the same one per kind.
+export function subscribe(
+  repo: string,
+  onChange: () => void,
+  onError: () => void,
+  relevant: (rel: string) => boolean = isRelevant,
+): () => void {
   let entry = entries.get(repo)
   if (!entry) {
     // fs.watch does not agree across platforms about a path that isn't there:
@@ -72,11 +93,16 @@ export function subscribe(repo: string, onChange: () => void, onError: () => voi
     const debouncer = createDebouncer(() => {
       for (const s of subs) s.onChange()
     })
+    const fresh: Entry = { watcher: undefined as unknown as FSWatcher, debouncer, subs, ignored: [] }
     const watcher = watch(repo, { recursive: true }, (_event, filename) => {
       // null filename: platform couldn't tell — refresh conservatively
-      if (filename === null || isRelevant(filename.toString())) debouncer.hit()
+      if (filename === null) return debouncer.hit()
+      // Windows reports backslashes; the ignore prefixes and relevance rules are '/'-based
+      const rel = filename.toString().replaceAll('\\', '/')
+      if (fresh.ignored.some(p => rel === p || rel.startsWith(p + '/'))) return
+      if (relevant(rel)) debouncer.hit()
     })
-    const fresh: Entry = { watcher, debouncer, subs }
+    fresh.watcher = watcher
     watcher.on('error', () => {
       entries.delete(repo)
       debouncer.dispose()

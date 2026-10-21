@@ -9,6 +9,7 @@ import { rowOrder, sameRow, step } from './rowNav'
 import type { Selection } from './RepoView'
 import { toastErr } from './Toast'
 import { useAvatar, initials } from './avatar'
+import { tilde } from './paths'
 
 const ROW = 28
 const COL = 18
@@ -175,7 +176,7 @@ const fmtDate = (unix: number) => {
   return new Date(unix * 1000).toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' })
 }
 
-function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onCheckout, onChipMenu, onRowMenu }: {
+function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, trail, onCheckout, onChipMenu, onRowMenu, held, home, onOpen }: {
   repo: string
   c: Commit
   row: LaneRow
@@ -188,6 +189,9 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
   onCheckout: (branch: string, fromRemote?: boolean) => void
   onChipMenu: (e: ReactMouseEvent, chip: RefChip, hash: string) => void
   onRowMenu: (e: ReactMouseEvent, hash: string) => void
+  held: Map<string, string>
+  home: string
+  onOpen: (path: string) => void
 }) {
   const isMerge = c.parents.length > 1
   const avatarUrl = useAvatar(repo, isMerge ? null : c.email)
@@ -204,7 +208,8 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
           // icon count feeds the chip's flex-basis so every name gets the same
           // number of pixels (see .ref-chip); icons are unshrinkable, so a chip
           // that carries three of them would otherwise lose its whole name first
-          const nIcons = (chip.head ? 1 : 0) + (chip.tag ? 1 : 0) + (chip.local && !chip.tag ? 1 : 0) + (chip.remote ? 1 : 0)
+          const wt = chip.local && !chip.tag ? held.get(chip.name) : undefined
+          const nIcons = (chip.head ? 1 : 0) + (chip.tag ? 1 : 0) + (chip.local && !chip.tag ? 1 : 0) + (chip.remote ? 1 : 0) + (wt ? 1 : 0)
           return (
           <span
             key={chip.name}
@@ -221,6 +226,17 @@ function CommitRow({ repo, c, row, width, remotes, selected, onSelect, dashes, t
             {chip.tag && <TagIcon />}
             {chip.local && !chip.tag && <LocalIcon />}
             {chip.remote && <GithubIcon size={11} className="ref-icon" />}
+            {/* checked out in another worktree: jump to its tab. Swallows dblclick and
+                contextmenu too, or the chip would also checkout / open its menu */}
+            {wt && (
+              <button
+                className="wt-badge"
+                title={`open in ${tilde(wt, home)}`}
+                onClick={e => { e.stopPropagation(); onOpen(wt) }}
+                onDoubleClick={e => e.stopPropagation()}
+                onContextMenu={e => { e.preventDefault(); e.stopPropagation() }}
+              >⎇</button>
+            )}
           </span>
           )
         })}
@@ -294,7 +310,7 @@ function StashRow({ s, lane, passRow, width, dashes, trailLane, selected, onSele
   )
 }
 
-function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selection, onSelect, onLoadMore, hasMore, onBusy }: {
+function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selection, onSelect, onLoadMore, hasMore, onBusy, held, home, onOpen }: {
   repo: string
   commits: Commit[]
   status: StatusEntry[]
@@ -306,6 +322,9 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
   onLoadMore: () => void
   hasMore: boolean
   onBusy: (p: Promise<unknown>) => void
+  held: Map<string, string> // branch → path, for worktrees other than this one
+  home: string
+  onOpen: (path: string) => void
 }) {
   const headIdx = useMemo(() => commits.findIndex(c => c.refs.some(r => r === 'HEAD' || r.startsWith('HEAD -> '))), [commits])
   const headHash = headIdx >= 0 ? commits[headIdx].hash : undefined
@@ -348,11 +367,17 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
   const branchApi = (body: object, label: string) =>
     onBusy(branchPost(body).catch(err => toastErr(`${label} failed:\n${(err as Error).message}`)))
   const checkout = (branch: string, fromRemote = false) => {
-    type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number }
+    type CheckoutRes = { diverged?: boolean; remoteRef?: string; ahead?: number; behind?: number; heldBy?: string }
     const post = (body: object) =>
       api<CheckoutRes>(`/api/checkout?repo=${encodeURIComponent(repo)}`, jsonInit('POST', body))
     onBusy(post({ branch, fromRemote })
       .then(r => {
+        // git refuses a branch checked out in another worktree; offer that tab instead.
+        // ponytail: native confirm as the Open button, like the diverged prompt below
+        if (r.heldBy) {
+          if (confirm(`'${branch}' is open in another worktree:\n${r.heldBy}\n\nOpen its tab?`)) onOpen(r.heldBy)
+          return
+        }
         if (!r.diverged) return
         // ponytail: native confirm as the popup; custom modal when it grates
         const ok = confirm(
@@ -576,6 +601,9 @@ function GraphView({ repo, commits, status, remotes, stashes, githubUrl, selecti
               onCheckout={checkout}
               onChipMenu={(e, chip, hash) => openMenu(e, chipItems(chip, hash))}
               onRowMenu={(e, hash) => openMenu(e, rowItems(hash))}
+              held={held}
+              home={home}
+              onOpen={onOpen}
             />
           </Fragment>
         )

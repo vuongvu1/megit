@@ -9,6 +9,24 @@ surface, and the HTTP API may change in any minor release.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-21
+
+### Added
+
+- **Worktrees.** A repo with linked worktrees gets a panel beside the graph listing each
+  one with its branch and a live count of changed files. Click a row to open it as its own
+  `⎇` tab. The panel resizes, collapses to a rail showing the count, and deletes a worktree
+  from the trash icon on hover, after confirming (its branch stays).
+- A branch checked out in another worktree carries a `⎇` marker on its chip. Checking it
+  out offers to open that worktree's tab instead, before anything is stashed.
+
+### Fixed
+
+- Tabs for linked worktrees refresh on their own after commits, checkouts and stashes made
+  outside megit. Only file edits used to show up.
+- A worktree tab whose folder was deleted shows "Worktree removed" and stays open until
+  you close it.
+
 ## [0.13.0] - 2026-10-09
 
 ### Added

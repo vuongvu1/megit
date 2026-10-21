@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { base, tilde } from './paths'
 
-export default function TabBar({ repos, home, active, onSelect, onAdd, onClose, onReorder, onReorderEnd, onSettings }: {
+export default function TabBar({ repos, home, linked, active, onSelect, onAdd, onClose, onReorder, onReorderEnd, onSettings }: {
   repos: string[]
   home: string
+  linked: string[]
   active: string | null
   onSelect: (r: string) => void
   onAdd: () => void
@@ -21,10 +22,12 @@ export default function TabBar({ repos, home, active, onSelect, onAdd, onClose, 
         <img src="/logo.svg" className="logo" alt="" />
         <span className="build-tag">{import.meta.env.DEV ? '[DEV]' : `v${__VERSION__}`}</span>
       </div>
-      {repos.map((r, i) => (
+      {repos.map((r, i) => {
+        const wt = linked.includes(r)
+        return (
         <div
           key={r}
-          className={`tab${r === active ? ' active' : ''}${i === dragIdx ? ' dragging' : ''}`}
+          className={`tab${r === active ? ' active' : ''}${wt ? ' wt' : ''}${i === dragIdx ? ' dragging' : ''}`}
           title={tilde(r, home)}
           draggable
           onClick={() => onSelect(r)}
@@ -42,7 +45,7 @@ export default function TabBar({ repos, home, active, onSelect, onAdd, onClose, 
           }}
           onDragEnd={() => { setDragIdx(null); onReorderEnd() }}
         >
-          {base(r)}
+          {wt ? `⎇ ${base(r)}` : base(r)}
           <button className="tab-close" title={`Close ${base(r)}`} aria-label={`Close ${base(r)}`} onClick={e => { e.stopPropagation(); onClose(r) }}>
             {/* SVG, not a × glyph: a text glyph is placed by the font's baseline, so flex centering
                 centers its line box and leaves the visible ink off-centre. This cross is symmetric
@@ -52,7 +55,8 @@ export default function TabBar({ repos, home, active, onSelect, onAdd, onClose, 
             </svg>
           </button>
         </div>
-      ))}
+        )
+      })}
       <button className="tab-add" onClick={onAdd}>+</button>
       <button className="tab-cog" onClick={onSettings} title="Settings" aria-label="Settings">
         {/* Inline SVG, not an icon package — runtime dependencies stay at ws. */}

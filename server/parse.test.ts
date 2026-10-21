@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex } from './parse.ts'
+import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, parseWorktrees, stashIndex } from './parse.ts'
 
 const F = '\x1f'
 const R = '\x1e'
@@ -188,5 +188,37 @@ describe('mergeMatches', () => {
     expect(mergeMatches([exact]).truncated).toBe(false)
     expect(mergeMatches([])).toEqual({ matches: [], truncated: false })
     expect(mergeMatches([[], []])).toEqual({ matches: [], truncated: false })
+  })
+})
+
+describe('parseWorktrees', () => {
+  it('parses main, linked and detached records', () => {
+    const raw = 'worktree /r\nHEAD aaa\nbranch refs/heads/main\n\nworktree /r-wt\nHEAD bbb\nbranch refs/heads/feat/x\n\nworktree /tmp/a b/ü\nHEAD ccc\ndetached\n\n'
+    expect(parseWorktrees(raw)).toEqual([
+      { path: '/r', head: 'aaa', branch: 'main', prunable: false, bare: false },
+      { path: '/r-wt', head: 'bbb', branch: 'feat/x', prunable: false, bare: false },
+      { path: '/tmp/a b/ü', head: 'ccc', branch: null, prunable: false, bare: false },
+    ])
+  })
+
+  it('tolerates a missing or doubled trailing blank line', () => {
+    const want = [{ path: '/r', head: 'aaa', branch: 'main', prunable: false, bare: false }]
+    expect(parseWorktrees('worktree /r\nHEAD aaa\nbranch refs/heads/main\n')).toEqual(want)
+    expect(parseWorktrees('worktree /r\nHEAD aaa\nbranch refs/heads/main\n\n\n')).toEqual(want)
+  })
+
+  it('flags prunable records', () => {
+    const raw = 'worktree /r\nHEAD aaa\nbranch refs/heads/main\n\nworktree /gone\nHEAD bbb\nbranch refs/heads/x\nprunable gitdir file points to non-existent location\n\n'
+    expect(parseWorktrees(raw)[1]).toEqual({ path: '/gone', head: 'bbb', branch: 'x', prunable: true, bare: false })
+  })
+
+  it('flags bare records', () => {
+    expect(parseWorktrees('worktree /r.git\nbare\n\n')).toEqual([
+      { path: '/r.git', head: '', branch: null, prunable: false, bare: true },
+    ])
+  })
+
+  it('empty input is empty', () => {
+    expect(parseWorktrees('')).toEqual([])
   })
 })

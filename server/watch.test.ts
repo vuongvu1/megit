@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { isRelevant, createDebouncer } from './watch.ts'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { isRelevant, isGitDirRelevant, createDebouncer } from './watch.ts'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { subscribe, activeWatcherCount } from './watch.ts'
+import { subscribe, setIgnored, activeWatcherCount } from './watch.ts'
 
 describe('isRelevant', () => {
   it.each<[string, boolean]>([
@@ -31,8 +31,26 @@ describe('isRelevant', () => {
     ['.git/logs/HEAD', false],
     ['.git/FETCH_HEAD', false],
     ['.git/COMMIT_EDITMSG', false],
+    ['.git/worktrees/feat/HEAD', true],
+    ['.git/worktrees/feat/index', true],
+    ['.git/worktrees/feat/index.lock', false],
+    ['.git/worktrees/feat/logs/HEAD', false],
   ])('%s → %s', (path, expected) => {
     expect(isRelevant(path)).toBe(expected)
+  })
+})
+
+describe('isGitDirRelevant', () => {
+  it.each<[string, boolean]>([
+    ['HEAD', true],
+    ['refs/heads/x', true],
+    ['packed-refs', true],
+    ['worktrees/a/HEAD', true],
+    ['worktrees/a/ORIG_HEAD', false],
+    ['objects/ab/cd', false],
+    ['worktrees/a/b/HEAD', false],
+  ])('%s → %s', (path, expected) => {
+    expect(isGitDirRelevant(path)).toBe(expected)
   })
 })
 
@@ -178,6 +196,53 @@ integration('subscribe (integration, real fs + timers)', () => {
       await waitFor(() => events >= 1, 5000)
       unsub2()
       expect(activeWatcherCount()).toBe(0)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }, 15000)
+
+  it('linked worktree: commit fires a subscription on the common git dir', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'megit-watch-'))
+    try {
+      const dir = join(root, 'main')
+      const wt = join(root, 'wt')
+      execFileSync('git', ['init', dir])
+      const git = (cwd: string, ...a: string[]) =>
+        execFileSync('git', ['-C', cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', ...a])
+      git(dir, 'commit', '--allow-empty', '-m', 'init')
+      git(dir, 'worktree', 'add', wt, '-b', 'wt')
+      let events = 0
+      const unsub = subscribe(join(dir, '.git'), () => { events++ }, () => {}, isGitDirRelevant)
+      await sleep(300) // FSEvents warm-up
+      git(wt, 'commit', '--allow-empty', '-m', 'in wt')
+      await waitFor(() => events >= 1, 5000)
+      unsub()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 15000)
+
+  it('setIgnored drops events under an ignored prefix', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'megit-watch-'))
+    try {
+      execFileSync('git', ['-C', dir, 'init'])
+      mkdirSync(join(dir, 'nested'))
+      let events = 0
+      const unsub = subscribe(dir, () => { events++ }, () => {})
+      try {
+        setIgnored(dir, ['nested'])
+        // FSEvents can deliver `git init`'s own .git/HEAD writes after subscribe —
+        // a real, relevant event. Let it flush past the 400 ms trailing debounce, then count.
+        await sleep(1000)
+        events = 0
+        writeFileSync(join(dir, 'nested', 'x.txt'), 'x')
+        await sleep(2500) // past the debouncer's max-wait
+        expect(events).toBe(0)
+        writeFileSync(join(dir, 'top.txt'), 'x')
+        await waitFor(() => events >= 1, 5000)
+      } finally {
+        unsub() // even on failure, so afterEach's leak check reports this test only once
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
