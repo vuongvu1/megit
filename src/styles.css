@@ -269,26 +269,23 @@ button:hover { background: var(--border); }
 .panes { flex: 1; display: flex; min-height: 0; }
 .panes-row { flex: 1; display: flex; min-height: 0; }
 .panes-row > .panes { min-width: 0; }
-/* worktree strip: resizable via the .splitter after it, collapsible to a 24px rail;
-   purple matches the linked-worktree tab */
-.wt-strip { flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--bg-tab); }
-.wt-strip.collapsed { width: 24px; padding: 6px 0; align-items: center; border-right: 1px solid var(--border); }
-.wt-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 4px 6px; font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: .04em; }
-.wt-toggle { border: none; background: none; padding: 0 4px; line-height: 1.4; font-size: 12px; color: #c8a6ff; border-radius: 3px; }
-.wt-toggle:hover { background: var(--bg-hover); }
-:root[data-theme="light"] .wt-toggle { color: #8250df; }
-.wt-item { display: flex; align-items: center; border-radius: 4px; }
+/* worktree strip: resizable via the .splitter after it, collapsible to a 24px rail.
+   Rows mirror the commit panel's .file-row: same font, hover, selected, trash button */
+.wt-strip { flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; padding: 4px; background: var(--bg-tab); }
+.wt-strip.collapsed { width: 28px; padding: 6px 0; align-items: center; border-right: 1px solid var(--border); }
+.wt-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 6px 8px; font-size: var(--t1); color: var(--fg-dim); text-transform: uppercase; letter-spacing: .04em; }
+.wt-toggle { border: none; background: none; padding: 0 5px; font: inherit; font-size: var(--t2); line-height: 1.4; color: var(--fg-dim); }
+.wt-toggle:hover { background: var(--bg-hover); color: var(--fg); }
+.wt-item { display: flex; align-items: center; gap: 4px; padding-right: 4px; border-radius: 4px; }
 .wt-item:hover { background: var(--bg-hover); }
-.wt-item > .wt-row { flex: 1; min-width: 0; }
-.wt-del { opacity: 0; flex-shrink: 0; border: none; background: none; padding: 2px 4px; margin-right: 2px; color: var(--fg-dim); border-radius: 3px; }
-.wt-item:hover .wt-del, .wt-del:focus-visible { opacity: 1; }
-.wt-del:hover { color: #f85149; background: var(--border); }
-.wt-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: none; border-radius: 4px; background: none; color: #c8a6ff; text-align: left; font-size: 12px; }
-.wt-row.current { background: var(--bg-selected); color: #a371f7; font-weight: 600; cursor: default; }
-:root[data-theme="light"] .wt-row { color: #8250df; }
-:root[data-theme="light"] .wt-row.current { color: #6f42c1; }
+.wt-item:has(.current) { background: var(--bg-selected); }
+.wt-item .row-action { visibility: hidden; }
+.wt-item:hover .row-action, .wt-item .row-action:focus-visible { visibility: visible; }
+.wt-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 3px 8px; border: none; background: none; color: var(--fg); text-align: left; font: inherit; }
+.wt-row:hover { background: none; }
+.wt-row.current { font-weight: 600; cursor: default; }
 .wt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wt-count { flex-shrink: 0; padding: 0 5px; border-radius: 8px; background: var(--border); color: var(--fg); font-size: 11px; font-weight: normal; }
+.wt-count { flex-shrink: 0; padding: 0 6px; border-radius: 8px; background: var(--border); color: var(--fg-dim); font-size: var(--t1); }
 
 .graph-pane { position: relative; width: var(--graph-w, 55%); flex-shrink: 0; display: flex; flex-direction: column; min-width: 0; }
 .graphview { flex: 1; overflow: auto; padding-bottom: 8px; }

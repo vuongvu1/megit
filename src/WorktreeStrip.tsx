@@ -21,7 +21,7 @@ type Props = {
 // Empty list (a repo with a single worktree) → nothing rendered, no column taken.
 // Width and collapsed state are global (localStorage), like the other splitters.
 export default function WorktreeStrip({ repo, worktrees, home, onOpen, onBusy, onRemoved }: Props) {
-  const [width, setWidth] = useState(() => Number(localStorage.getItem(W_KEY)) || 160)
+  const [width, setWidth] = useState(() => Number(localStorage.getItem(W_KEY)) || 200)
   const [open, setOpen] = useState(() => localStorage.getItem(OPEN_KEY) !== '0')
   const strip = useRef<HTMLDivElement>(null)
   if (worktrees.length === 0) return null
@@ -81,11 +81,10 @@ export default function WorktreeStrip({ repo, worktrees, home, onOpen, onBusy, o
             </button>
             {/* [0] is the main worktree, which git can't remove; the current one is the tab you're in */}
             {i > 0 && !w.current && (
-              <button className="wt-del" onClick={() => remove(w)} title="Delete worktree" aria-label={`Delete worktree ${tilde(w.path, home)}`}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4h8v2" />
-                  <path d="M6 6l1 14h10l1-14" />
+              <button className="row-action danger" onClick={() => remove(w)} title="Delete worktree" aria-label={`Delete worktree ${tilde(w.path, home)}`}>
+                {/* same trash as CommitPanel's discard; copied, not imported, so the strip doesn't pull that module in */}
+                <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  {['M2.5 4h11', 'M6.5 4V2.5h3V4', 'M4 4l.7 9.5h6.6L12 4', 'M6.5 6.5v5', 'M9.5 6.5v5'].map(d => <path key={d} d={d} />)}
                 </svg>
               </button>
             )}
