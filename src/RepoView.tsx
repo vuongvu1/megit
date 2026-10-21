@@ -474,7 +474,7 @@ export default function RepoView({ repo, home, linked, onOpen, onRemove, hasTerm
       )}
       {/* own row around .panes so the graph's percentage widths stay relative to .panes */}
       <div className="panes-row">
-      <WorktreeStrip worktrees={worktrees} home={home} onOpen={onOpen} />
+      <WorktreeStrip repo={repo} worktrees={worktrees} home={home} onOpen={onOpen} onBusy={spinWhile} onRemoved={loadWorktrees} />
       <div className="panes" style={{ '--graph-w': selection ? `${graphPct}%` : '100%' } as CSSProperties}>
         <div className={busy ? 'graph-pane busy' : 'graph-pane'} style={{ '--refs-w': `${refsW}px`, '--graph-col-w': `${graphColW}px` } as CSSProperties}>
           <GraphView repo={repo} commits={commits} status={status} remotes={remotes} stashes={stashes} githubUrl={githubUrl} selection={selection} onSelect={setSelection} onLoadMore={loadMore} hasMore={hasMore} onBusy={spinWhile} held={held} home={home} onOpen={openWt} />

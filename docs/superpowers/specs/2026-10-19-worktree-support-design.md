@@ -8,7 +8,8 @@ The user runs coding agents (T3 Code, Claude Code, plain terminal) that each wor
 `git worktree`. megit should let them **watch that work**: which worktrees exist, which ones have
 uncommitted changes right now, and what those changes are. Today megit has no idea worktrees exist.
 
-megit is a viewer here. Worktrees are created and deleted by other tools; megit never does either.
+megit is mostly a viewer here. Worktrees are created by other tools; megit can delete one from the strip
+(added 2026-10-21 at the user's request — see Decided).
 
 ## What exists today
 
@@ -46,7 +47,7 @@ megit is a viewer here. Worktrees are created and deleted by other tools; megit 
 
 ## Non-goals
 
-- Creating, removing, pruning, locking or moving worktrees.
+- Creating, pruning, locking or moving worktrees.
 - Showing other worktrees' WIP inside one graph (mockup option "B"). Rejected for cost and clutter; the
   strip + tabs cover it.
 - Live counts for repos in background tabs. Only the active tab is mounted, and that stays true.
@@ -81,7 +82,11 @@ re-render.
 - Live counts, with the cost above.
 - Worktree tabs are ordinary registered repos (same config list, same `repoGuard`), so every existing
   feature works in them for free.
-- View-only: no worktree mutations.
+- Delete from the strip (user's call, 2026-10-21): a trash icon on hover of each linked, non-current row,
+  behind a `confirm`. It names the branch that stays and the uncommitted file count that would be lost;
+  `--force` is sent only when that count was non-zero, so a stale zero count lets git refuse instead of
+  silently discarding work. The main worktree has no trash icon and the server allow-lists the path.
+- Strip is resizable (splitter, 100–480 px) and collapsible to a 24 px rail; both persist globally.
 - Removed worktree → its tab stays, showing "worktree removed", until the user closes it (user's call,
   2026-10-19). Worktree tabs persist across restarts like any other tab.
 

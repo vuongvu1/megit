@@ -9,7 +9,7 @@ import { resolveAvatar, parseGithubRemote } from './avatars.ts'
 import { mergeMatches, parseBranchHeader, parseLog, parseMatches, parseMeta, parseNameStatus, parseStatus, stashIndex, LOG_FORMAT, META_FORMAT } from './parse.ts'
 import { pickOperation, STATE_FILES, type OpKind } from './operation.ts'
 import { checkoutPlan } from './checkout.ts'
-import { heldBy, isLinkedWorktree, watchRepo, worktreesWithCounts } from './worktrees.ts'
+import { heldBy, isLinkedWorktree, listWorktrees, watchRepo, worktreesWithCounts } from './worktrees.ts'
 import { wireTerminal, hasPty } from './term.ts'
 
 // JSON bodies are capped at 10mb by createApp — a resolved conflicted file goes
@@ -294,6 +294,24 @@ app.get('/api/worktrees', repoGuard, async (req, res) => {
     res.json({ worktrees: await worktreesWithCounts(String(req.query.repo), git) })
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
+  }
+})
+
+// Removes a linked worktree. The path is allow-listed against git's own list, minus
+// [0] (the main worktree, which git can't remove). Without force, git refuses a
+// worktree with uncommitted or untracked files — the client only sends force after
+// the user confirmed losing them. Locked worktrees stay git's error. The branch stays.
+app.post('/api/worktrees', repoGuard, async (req, res) => {
+  const repo = String(req.query.repo)
+  try {
+    const [, ...linked] = await listWorktrees(repo, git)
+    const target = linked.find(w => w.path === req.body.path)
+    if (!target) throw httpError(400, 'not a linked worktree of this repo')
+    await git(repo, ['worktree', 'remove', ...(req.body.force === true ? ['--force'] : []), target.path])
+    res.json({ ok: true })
+  } catch (e) {
+    const err = e as Error
+    res.status((err as { status?: number }).status ?? 409).json({ error: err.message })
   }
 })
 

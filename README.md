@@ -55,7 +55,7 @@ Stashes appear as their own rows, attached to the commit they were taken from wi
 
 ### Worktrees
 
-A repository with linked worktrees gets a strip beside the graph listing each one with its branch and changed-file count. Click a row to open it in its own purple `⎇` tab; counts update live, and a branch checked out elsewhere is marked on its chip and offers to open that tab instead of failing the checkout.
+A repository with linked worktrees gets a strip beside the graph listing each one with its branch and changed-file count. Click a row to open it in its own purple `⎇` tab; counts update live, and a branch checked out elsewhere is marked on its chip and offers to open that tab instead of failing the checkout. Drag the strip's edge to resize it, `«` to collapse it, and the trash icon on a row deletes that worktree (its branch stays).
 
 ### Diffs
 

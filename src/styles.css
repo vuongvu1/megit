@@ -269,10 +269,21 @@ button:hover { background: var(--border); }
 .panes { flex: 1; display: flex; min-height: 0; }
 .panes-row { flex: 1; display: flex; min-height: 0; }
 .panes-row > .panes { min-width: 0; }
-/* worktree strip: fixed width, no splitter; purple matches the linked-worktree tab */
-.wt-strip { width: 160px; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--bg-tab); border-right: 1px solid var(--border); }
+/* worktree strip: resizable via the .splitter after it, collapsible to a 24px rail;
+   purple matches the linked-worktree tab */
+.wt-strip { flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--bg-tab); }
+.wt-strip.collapsed { width: 24px; padding: 6px 0; align-items: center; border-right: 1px solid var(--border); }
+.wt-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 4px 6px; font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: .04em; }
+.wt-toggle { border: none; background: none; padding: 0 4px; line-height: 1.4; font-size: 12px; color: #c8a6ff; border-radius: 3px; }
+.wt-toggle:hover { background: var(--bg-hover); }
+:root[data-theme="light"] .wt-toggle { color: #8250df; }
+.wt-item { display: flex; align-items: center; border-radius: 4px; }
+.wt-item:hover { background: var(--bg-hover); }
+.wt-item > .wt-row { flex: 1; min-width: 0; }
+.wt-del { opacity: 0; flex-shrink: 0; border: none; background: none; padding: 2px 4px; margin-right: 2px; color: var(--fg-dim); border-radius: 3px; }
+.wt-item:hover .wt-del, .wt-del:focus-visible { opacity: 1; }
+.wt-del:hover { color: #f85149; background: var(--border); }
 .wt-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: none; border-radius: 4px; background: none; color: #c8a6ff; text-align: left; font-size: 12px; }
-.wt-row:hover:not(:disabled) { background: var(--bg-hover); }
 .wt-row.current { background: var(--bg-selected); color: #a371f7; font-weight: 600; cursor: default; }
 :root[data-theme="light"] .wt-row { color: #8250df; }
 :root[data-theme="light"] .wt-row.current { color: #6f42c1; }
