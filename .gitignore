@@ -9,3 +9,4 @@ dist-server
 test-repo
 .superpowers
 wip-check.yml
+test-repo.worktrees

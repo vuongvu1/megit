@@ -21,7 +21,7 @@ pnpm build          # catches anything the dev server tolerates
 
 CI runs all of this on Linux, macOS and Windows, plus `pnpm build:server` and a smoke test of the CLI entrypoint.
 
-`scripts/make-test-repo.sh` regenerates `test-repo/` — a throwaway fixture with interleaved branches, merges, two stashes and a dirty worktree. It is git-ignored, safe to delete, and is what the README screenshots are taken from. Note that vitest is configured to exclude it: the fixture contains a plausible-looking `test/renderer.test.ts` that would otherwise be collected into the real suite.
+`scripts/make-test-repo.sh` regenerates `test-repo/` — a throwaway fixture with interleaved branches, merges, two stashes and a dirty worktree. It is git-ignored, safe to delete, and is what the README screenshots are taken from. `--worktrees` also creates two linked worktrees in `test-repo.worktrees/`, for the worktree panel screenshot. Note that vitest is configured to exclude it: the fixture contains a plausible-looking `test/renderer.test.ts` that would otherwise be collected into the real suite.
 
 ## Things worth knowing
 

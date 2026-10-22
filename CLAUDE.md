@@ -62,7 +62,7 @@ End-to-end verification (build, launch, drive with Playwright, API curl probes):
 - `~/.config/megit/config.json` is real user state. To drive the app without touching it (screenshots, probes), launch the server with an isolated `HOME`.
 - Design docs live in `docs/superpowers/specs/` — the *why* behind a feature, kept so decisions don't get re-litigated. Implementation plans are scratch: write them wherever, delete them once the feature ships.
 - Playwright MCP drops `.playwright-mcp/` artifacts into the CWD — keep them out of commits.
-- `scripts/make-test-repo.sh` regenerates `test-repo/`: interleaved branches, merges, two stashes, dirty worktree. It is also the source of the README screenshots.
+- `scripts/make-test-repo.sh` regenerates `test-repo/`: interleaved branches, merges, two stashes, dirty worktree. It is also the source of the README screenshots. `--worktrees` adds two linked worktrees (`test-repo.worktrees/`) for the worktree panel.
 
 ## Releasing
 
