@@ -55,7 +55,19 @@ Stashes appear as their own rows, attached to the commit they were taken from wi
 
 ### Worktrees
 
-A repository with linked worktrees gets a panel beside the graph listing each one with its branch and changed-file count. Click a row to open it in its own purple `⎇` tab; counts update live, and a branch checked out elsewhere is marked on its chip and offers to open that tab instead of failing the checkout. Drag the panel's edge to resize it, collapse it to a rail that keeps the worktree count, and the trash icon on a row deletes that worktree (its branch stays).
+A worktree is a second checkout of the same repository in its own folder, on its own branch — how coding agents (Claude Code, T3 Code, Codex) work in parallel without touching your checkout. megit doesn't create them; it shows the ones your tools made.
+
+![the worktree panel listing three worktrees with their changed-file counts, beside the graph](docs/worktrees.png)
+
+A repository with linked worktrees gets a panel beside the graph listing each one with its branch and a live count of changed files. Click a row to open that worktree in its own purple `⎇` tab. A branch checked out in another worktree carries a `⎇` on its chip, and checking it out offers to open that tab instead of failing. Drag the panel's edge to resize it, collapse it to a rail that keeps the count, and use the trash icon on a row to delete that worktree (its branch stays).
+
+To try it on any repository:
+
+```bash
+git worktree add ../myapp-login -b fix/login   # new folder, new branch
+echo "// wip" >> ../myapp-login/src/app.ts     # the panel's count goes to 1
+git worktree remove --force ../myapp-login     # or the trash icon in megit
+```
 
 ### Diffs
 
@@ -169,7 +181,7 @@ Ports come from `PORT` (API, default 3411) and `UI_PORT` (Vite dev server, defau
 
 In development the server runs its TypeScript directly via Node's native type-stripping — no build step. That does not work for a published package, because Node refuses to strip types under `node_modules`, so `pnpm build:server` compiles `server/` to `dist-server/` at publish time.
 
-`scripts/make-test-repo.sh` generates `test-repo/` — a throwaway fixture with interleaved branches, merges, stashes and a dirty worktree, used for manual testing and for the screenshots above.
+`scripts/make-test-repo.sh` generates `test-repo/` — a throwaway fixture with interleaved branches, merges, stashes and a dirty worktree, used for manual testing and for the screenshots above. `--worktrees` adds two linked worktrees with uncommitted work in `test-repo.worktrees/`.
 
 [`docs/architecture.md`](docs/architecture.md) explains how the two halves fit together and why the graph layout lives in a pure module. [CONTRIBUTING.md](CONTRIBUTING.md) has the setup and the house rules; [SECURITY.md](SECURITY.md) has the threat model.
 

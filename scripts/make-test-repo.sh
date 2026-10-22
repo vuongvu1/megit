@@ -4,9 +4,12 @@
 # --date-order, so parallel branches only weave into visible lanes when their
 # timestamps overlap. Safe to delete and re-run.
 set -euo pipefail
+# --worktrees also adds two linked worktrees in test-repo.worktrees/, as an agent
+# tool would — for the README's worktree panel screenshot. Off by default: with
+# them, every other screenshot would grow the panel too.
 
 cd "$(dirname "$0")/.."
-rm -rf test-repo
+rm -rf test-repo test-repo.worktrees
 mkdir test-repo
 cd test-repo
 
@@ -242,4 +245,21 @@ cat > assets/star.svg <<'EOF'
 EOF
                                            # unstaged
 
-echo "test-repo ready: $(git log --oneline --all | wc -l | tr -d ' ') commits, $(git branch | wc -l | tr -d ' ') branches, $(git stash list | wc -l | tr -d ' ') stashes, dirty worktree"
+# ── linked worktrees (opt-in): two agents mid-task, both with uncommitted work ─
+if [[ "${1:-}" == "--worktrees" ]]; then
+  wt=../test-repo.worktrees
+  git worktree add -q "$wt/particles" feature/particles
+  printf '%s\n' "export const maxParticles = 2048" >> "$wt/particles/src/config.ts"
+  printf '%s\n' "// TODO: pool emitters" > "$wt/particles/src/emitter.ts"
+
+  git worktree add -q -b agent/fps-overlay "$wt/fps-overlay" main
+  (
+    cd "$wt/fps-overlay"
+    w src/overlay.ts "export const showFps = true"
+    commit "add fps overlay toggle" 09 10:00 "Claude" "agent@example.com"
+    printf '%s\n' "export const overlayCorner = 'top-right'" >> src/overlay.ts
+    printf '%s\n' "fps overlay: needs a design pass" > TODO.md
+  )
+fi
+
+echo "test-repo ready: $(git log --oneline --all | wc -l | tr -d ' ') commits, $(git branch | wc -l | tr -d ' ') branches, $(git stash list | wc -l | tr -d ' ') stashes, $(git worktree list | wc -l | tr -d ' ') worktrees, dirty"
