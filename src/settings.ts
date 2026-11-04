@@ -6,6 +6,7 @@ export type Settings = {
   avatars: boolean
   diffSplit: boolean
   pageSize: number // commits fetched per /api/graph request
+  editor: string // command the toolbar's editor button runs with the repo path appended
 }
 
 export const ZOOM_MIN = 0.8
@@ -36,6 +37,7 @@ export const DEFAULTS: Settings = {
   avatars: true,
   diffSplit: false,
   pageSize: 150,
+  editor: 'code',
 }
 
 // Snap before clamping so a float that arrived from repeated += 0.1 lands on a
@@ -62,6 +64,7 @@ export function parse(raw: string | null, defaults: Settings): Settings {
     // Allow-list rather than a clamp: an arbitrary stored number would light no
     // option in the dialog and could ask the server for a page it caps anyway.
     pageSize: PAGE_SIZES.includes(o.pageSize as (typeof PAGE_SIZES)[number]) ? o.pageSize! : defaults.pageSize,
+    editor: typeof o.editor === 'string' && o.editor.trim() ? o.editor : defaults.editor,
   }
 }
 

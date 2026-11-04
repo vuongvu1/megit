@@ -41,6 +41,12 @@ describe('parse', () => {
     expect(parse('{"pageSize":"200"}', DEFAULTS).pageSize).toBe(DEFAULTS.pageSize)
   })
 
+  it('keeps a stored editor command and falls back for a blank one', () => {
+    expect(parse('{"editor":"cursor -n"}', DEFAULTS).editor).toBe('cursor -n')
+    expect(parse('{"editor":"  "}', DEFAULTS).editor).toBe('code')
+    expect(parse('{"editor":3}', DEFAULTS).editor).toBe('code')
+  })
+
   it('honours a caller-supplied default, for the diff-split migration', () => {
     const migrated = { ...DEFAULTS, diffSplit: true }
     expect(parse(null, migrated).diffSplit).toBe(true)

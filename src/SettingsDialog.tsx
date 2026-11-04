@@ -98,6 +98,23 @@ export default function Settings({ onClose }: { onClose: () => void }) {
               commits already loaded — “Search all history” in the search bar reaches past them.
             </div>
             <div className="settings-row">
+              <label htmlFor="set-editor">Editor command</label>
+              <input
+                id="set-editor"
+                type="text"
+                spellCheck={false}
+                autoComplete="off"
+                placeholder={DEFAULTS.editor}
+                value={s.editor}
+                onChange={e => setSetting('editor', e.target.value)}
+              />
+            </div>
+            <div className="settings-warn">
+              Run by the toolbar’s editor button with the repository path appended — <code>code</code>,{' '}
+              <code>cursor</code>, <code>zed</code>, <code>subl</code>. Must be on the PATH of the shell
+              that started megit.
+            </div>
+            <div className="settings-row">
               {/* The label is no longer a control's label, so it needs an id the
                   group points back to — a bare <label> beside a button pair
                   announces nothing. */}
