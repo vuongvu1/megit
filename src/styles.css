@@ -235,8 +235,11 @@ button:hover { background: var(--border); }
 .tb-btn:disabled { opacity: .4; cursor: default; }
 .tb-badge { min-width: 15px; padding: 0 4px; border-radius: 7px; background: var(--bg-selected); color: var(--fg); font-size: 11px; line-height: 15px; text-align: center; }
 .repo-path { min-width: 0; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.github-link { display: inline-flex; align-items: center; color: var(--fg-dim); flex-shrink: 0; }
-.github-link:hover { color: var(--fg); }
+.github-link { display: inline-flex; align-items: center; padding: 3px 4px; border-radius: 4px; color: var(--fg-dim); flex-shrink: 0; }
+/* .toolbar-scoped to outrank `.toolbar button` padding and `button:hover` fill, so
+   the editor button and the GitHub link share one look */
+.toolbar .editor-btn { display: inline-flex; align-items: center; padding: 3px 4px; color: var(--fg-dim); background: none; border-color: transparent; flex-shrink: 0; }
+.github-link:hover, .toolbar .editor-btn:hover { color: var(--fg); background: var(--bg-hover); }
 .term-btn { display: inline-flex; align-items: center; padding: 3px 5px; color: var(--fg-dim); }
 .term-btn:hover { color: var(--fg); }
 .term-btn.active { color: var(--fg); background: var(--bg-selected); }

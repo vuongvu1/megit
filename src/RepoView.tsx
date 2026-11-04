@@ -13,7 +13,7 @@ import type { Worktree } from '../server/worktrees.ts'
 import WorktreeStrip from './WorktreeStrip'
 import { label, matchLocal, stepMatch } from './search'
 import { toastErr } from './Toast'
-import { useSetting } from './settingsStore'
+import { getSettings, useSetting } from './settingsStore'
 import { tilde } from './paths'
 
 // diff2html + highlight.js (~1 MB, 82% of the old main bundle) stay out until a
@@ -442,6 +442,16 @@ export default function RepoView({ repo, home, linked, onOpen, onRemove, hasTerm
               <GithubIcon size={14} />
             </a>
           )}
+          <button
+            className="editor-btn"
+            onClick={() => api(`/api/open-editor?${q}`, jsonInit('POST', { cmd: getSettings().editor })).catch(e => toastErr(e.message))}
+            title="Open in editor"
+            aria-label="Open in editor"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M8 6l-6 6 6 6M16 6l6 6-6 6" />
+            </svg>
+          </button>
           <button className="refresh-btn" onClick={() => refresh()} title="Fetch & refresh (r)" aria-label="Fetch and refresh">
             <svg className={spinning ? 'spin' : undefined} onAnimationIteration={() => { if (!inflight.current) setSpinning(false) }} viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />

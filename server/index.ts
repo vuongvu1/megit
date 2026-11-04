@@ -1,5 +1,5 @@
 import { createApp, serveStatic, type Handler } from './http.ts'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { readFile, realpath, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -295,6 +295,30 @@ app.get('/api/worktrees', repoGuard, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: (e as Error).message })
   }
+})
+
+// Opens the repo in the user's editor. The command comes from the client's
+// settings — no new capability, /api/term already runs anything, and the Host pin
+// keeps foreign pages out. No shell: the command splits on whitespace and the repo
+// path is its own argv entry, so neither can inject. Answers once the process has
+// either spawned or failed, so a missing `code` reaches the user as an error.
+// ponytail: whitespace split — an editor path containing spaces needs a PATH entry
+// instead. Windows .cmd shims (code.cmd) can't spawn without a shell; unverified there.
+app.post('/api/open-editor', repoGuard, (req, res) => {
+  const argv = typeof req.body.cmd === 'string' ? req.body.cmd.trim().split(/\s+/).filter(Boolean) : []
+  if (!argv.length) {
+    res.status(400).json({ error: 'no editor command set' })
+    return
+  }
+  const child = spawn(argv[0], [...argv.slice(1), String(req.query.repo)], { detached: true, stdio: 'ignore' })
+  child.once('spawn', () => {
+    child.unref()
+    res.json({ ok: true })
+  })
+  child.once('error', e => {
+    const notFound = (e as NodeJS.ErrnoException).code === 'ENOENT'
+    res.status(notFound ? 404 : 500).json({ error: notFound ? `"${argv[0]}" not found — set your editor in Settings` : e.message })
+  })
 })
 
 // Removes a linked worktree. The path is allow-listed against git's own list, minus
