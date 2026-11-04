@@ -107,7 +107,7 @@ If what you want is further back than the rows you've loaded, the globe button r
 
 megit started as a viewer, but the common operations are here:
 
-- **Toolbar** — pull (fast-forward only), push, create branch, stash all, pop latest stash, undo last commit (soft reset, keeps changes staged)
+- **Toolbar** — pull (fast-forward only), push, create branch, stash all, pop latest stash, undo last commit (soft reset, keeps changes staged), open the repo in your editor
 - **Ref chips** — checkout, create branch here, rename, delete, set upstream, merge, rebase, delete tag, copy name, copy GitHub link
 - **Commit rows** — checkout, cherry-pick, revert, reset (soft / mixed / hard), copy hash, copy GitHub link
 - **Files** — stage, unstage, discard, commit, amend the last commit (message, staged changes, or both)
@@ -126,7 +126,7 @@ The cog at the right end of the tab bar opens font (bundled Ubuntu Mono, your sy
 monospace, or your system UI face), text size in four steps from 80% to 140%, the theme, the default diff
 view, how many commits each graph request loads (100–1000, default 150), and a toggle for
 author avatars — off stops the GitHub and Gravatar lookups megit otherwise makes per commit
-author. The same dialog lists every keyboard shortcut below, and the two mouse gestures:
+author, and the editor command the toolbar's editor button runs (default `code`). The same dialog lists every keyboard shortcut below, and the two mouse gestures:
 double-click a branch chip to check it out, right-click a row for its actions.
 
 ### Keyboard
